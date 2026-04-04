@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title data-i18n="popup.pageTitle">Inworld Selection TTS</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="popup">
+      <p class="eyebrow" data-i18n="common.brand">Inworld Selection TTS</p>
+      <h1 data-i18n="popup.heading">Selection TTS</h1>
+      <p id="summary" class="summary" data-i18n="popup.loadingSummary">Loading settings...</p>
+
+      <div class="actions">
+        <button id="speakButton" class="primary" type="button" data-i18n="popup.speakButton">
+          Speak current selection
+        </button>
+        <button id="stopButton" class="secondary" type="button" data-i18n="popup.stopButton">
+          Stop playback
+        </button>
+        <button id="settingsButton" class="secondary" type="button" data-i18n="popup.settingsButton">
+          Open settings
+        </button>
+      </div>
+
+      <p id="message" class="message" role="status" aria-live="polite"></p>
+    </main>
+
+    <script src="i18n.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title data-i18n="options.pageTitle">Inworld Selection TTS Settings</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <p class="eyebrow" data-i18n="common.brand">Inworld Selection TTS</p>
+        <h1 data-i18n="options.heroTitle">Selection TTS Settings</h1>
+        <p class="lede" data-i18n="options.heroLede">
+          Configure the Inworld API key, Voice ID, model, and test parameters used when reading selected text aloud.
+        </p>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2 data-i18n="options.connectionHeading">Connection Settings</h2>
+          <p data-i18n="options.connectionNote">
+            API keys are stored only in this browser extension's local storage and are never written into project files.
+          </p>
+        </div>
+
+        <form id="settings-form" class="form-grid">
+          <label class="field">
+            <span data-i18n="options.uiLanguageLabel">UI language</span>
+            <select id="uiLanguage" name="uiLanguage">
+              <option value="zh-CN" data-i18n="common.uiLanguageChinese">Simplified Chinese</option>
+              <option value="en" data-i18n="common.uiLanguageEnglish">English</option>
+            </select>
+          </label>
+
+          <label class="field field-full">
+            <span data-i18n="options.apiKeyLabel">Inworld API Key</span>
+            <input
+              id="apiKey"
+              name="apiKey"
+              type="password"
+              autocomplete="off"
+              data-i18n-placeholder="options.apiKeyPlaceholder"
+              placeholder="Enter your Inworld API key"
+              required
+            />
+          </label>
+
+          <label class="field">
+            <span data-i18n="options.voiceIdLabel">Voice ID</span>
+            <input
+              id="voiceId"
+              name="voiceId"
+              type="text"
+              autocomplete="off"
+              data-i18n-placeholder="options.voiceIdPlaceholder"
+              placeholder="For example: Alex or your custom voiceId"
+              required
+            />
+          </label>
+
+          <label class="field">
+            <span data-i18n="options.modelLabel">Model</span>
+            <select id="modelId" name="modelId">
+              <option value="inworld-tts-1.5-mini">inworld-tts-1.5-mini</option>
+              <option value="inworld-tts-1.5-max">inworld-tts-1.5-max</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span data-i18n="options.languageFilterLabel">Language filter</span>
+            <input
+              id="languageFilter"
+              name="languageFilter"
+              type="text"
+              autocomplete="off"
+              data-i18n-placeholder="options.languageFilterPlaceholder"
+              placeholder="Optional, comma-separated, for example: zh,en"
+            />
+          </label>
+
+          <label class="field">
+            <span data-i18n="options.sampleRateLabel">Sample rate</span>
+            <input
+              id="sampleRateHertz"
+              name="sampleRateHertz"
+              type="number"
+              min="8000"
+              step="1"
+              value="22050"
+            />
+          </label>
+
+          <label class="field">
+            <span data-i18n="options.temperatureLabel">Temperature</span>
+            <input
+              id="temperature"
+              name="temperature"
+              type="number"
+              min="0.1"
+              max="2"
+              step="0.1"
+              value="1"
+            />
+          </label>
+
+          <label class="field">
+            <span data-i18n="options.textNormalizationLabel">Text normalization</span>
+            <select id="applyTextNormalization" name="applyTextNormalization">
+              <option value="ON">ON</option>
+              <option value="OFF">OFF</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span data-i18n="options.audioEncodingLabel">Audio encoding</span>
+            <select id="audioEncoding" name="audioEncoding">
+              <option value="LINEAR16">LINEAR16 (WAV)</option>
+              <option value="MP3">MP3</option>
+              <option value="OGG_OPUS">OGG_OPUS</option>
+            </select>
+          </label>
+
+          <label class="field field-full checkbox-field">
+            <span class="checkbox-row">
+              <input id="enableWordHighlight" name="enableWordHighlight" type="checkbox" />
+              <strong data-i18n="options.wordHighlightTitle">Word-level highlighting during playback</strong>
+            </span>
+            <small data-i18n="options.wordHighlightDescription">
+              Requests word-level timestamps from Inworld and highlights the current word on the page. For best results, use English or Spanish text and set text normalization to OFF.
+            </small>
+          </label>
+
+          <label class="field field-full checkbox-field">
+            <span class="checkbox-row">
+              <input id="autoPlayOnSelection" name="autoPlayOnSelection" type="checkbox" />
+              <strong data-i18n="options.autoPlayTitle">Auto-play after selection</strong>
+            </span>
+            <small data-i18n="options.autoPlayDescription">
+              Starts reading automatically as soon as a selection is completed. Disabled by default to avoid accidental playback.
+            </small>
+          </label>
+
+          <label class="field field-full checkbox-field">
+            <span class="checkbox-row">
+              <input id="translationEnabled" name="translationEnabled" type="checkbox" />
+              <strong data-i18n="options.translationTitle">Translate before speaking</strong>
+            </span>
+            <small data-i18n="options.translationDescription">
+              When enabled, the selected text is first translated with an OpenAI-compatible LLM endpoint and then sent to Inworld TTS. Word highlighting is skipped automatically because playback follows the translated text.
+            </small>
+          </label>
+
+          <label class="field">
+            <span data-i18n="options.translationTargetLanguageLabel">Target language</span>
+            <input
+              id="translationTargetLanguage"
+              name="translationTargetLanguage"
+              type="text"
+              autocomplete="off"
+              data-i18n-placeholder="options.translationTargetLanguagePlaceholder"
+              placeholder="For example: Japanese, English, Simplified Chinese"
+            />
+          </label>
+
+          <label class="field">
+            <span data-i18n="options.translationModelLabel">Translation model</span>
+            <input
+              id="translationModel"
+              name="translationModel"
+              type="text"
+              autocomplete="off"
+              data-i18n-placeholder="options.translationModelPlaceholder"
+              placeholder="For example: gpt-4.1-mini or your compatible model name"
+            />
+          </label>
+
+          <label class="field field-full">
+            <span data-i18n="options.translationApiUrlLabel">LLM API URL</span>
+            <input
+              id="translationApiUrl"
+              name="translationApiUrl"
+              type="url"
+              autocomplete="off"
+              data-i18n-placeholder="options.translationApiUrlPlaceholder"
+              placeholder="https://api.openai.com/v1/chat/completions"
+            />
+          </label>
+
+          <label class="field field-full">
+            <span data-i18n="options.translationApiKeyLabel">LLM API Key</span>
+            <input
+              id="translationApiKey"
+              name="translationApiKey"
+              type="password"
+              autocomplete="off"
+              data-i18n-placeholder="options.translationApiKeyPlaceholder"
+              placeholder="Optional. Fill this in if your LLM service requires authentication."
+            />
+          </label>
+
+          <div class="actions field-full">
+            <button id="saveButton" type="submit" class="primary" data-i18n="options.saveButton">
+              Save settings
+            </button>
+            <button id="loadVoicesButton" type="button" class="secondary" data-i18n="options.loadVoicesButton">
+              Load voices
+            </button>
+          </div>
+        </form>
+
+        <p id="statusMessage" class="status" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2 data-i18n="options.voiceBrowserHeading">Voice Browser</h2>
+          <p data-i18n="options.voiceBrowserDescription">
+            Fetch the voices available to the current API key and quickly fill the selected Voice ID back into the form.
+          </p>
+        </div>
+
+        <label class="field field-full">
+          <span data-i18n="options.availableVoicesLabel">Available voices</span>
+          <select id="voiceSelect" size="8"></select>
+        </label>
+
+        <div class="voice-meta">
+          <p id="voiceDescription" data-i18n="options.voiceDescriptionEmpty">No voices have been loaded yet.</p>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2 data-i18n="options.testHeading">Test Playback</h2>
+          <p data-i18n="options.testDescription">
+            Validate your API key, Voice ID, and model settings here without leaving the settings page.
+          </p>
+        </div>
+
+        <label class="field field-full">
+          <span data-i18n="options.testTextLabel">Test text</span>
+          <textarea id="testText" rows="6" maxlength="2000">Hello, this is a test clip from the Inworld Selection TTS extension.</textarea>
+        </label>
+
+        <div class="actions field-full">
+          <button id="testButton" type="button" class="primary" data-i18n="options.testButton">
+            Test speech
+          </button>
+          <button id="stopButton" type="button" class="secondary" data-i18n="options.stopButton">
+            Stop playback
+          </button>
+        </div>
+      </section>
+
+      <section class="card note">
+        <h2 data-i18n="options.securityHeading">Security Notes</h2>
+        <p data-i18n="options.securityNote">
+          This implementation is intended for personal use: the API key is stored in extension-local storage and used directly by the background script. If you plan to distribute the extension, it is safer to route API calls through your own backend instead of shipping shared secrets to clients.
+        </p>
+      </section>
+    </main>
+
+    <script src="i18n.js"></script>
+    <script src="options.js"></script>
+  </body>
+</html>

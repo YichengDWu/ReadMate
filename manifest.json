@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "Inworld Selection TTS",
+  "description": "Select text on any page and read it aloud with Inworld TTS.",
+  "version": "0.2.0",
+  "permissions": [
+    "storage",
+    "contextMenus",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://api.inworld.ai/*",
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "i18n.js",
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "Inworld Selection TTS",
+    "default_popup": "popup.html"
+  },
+  "options_page": "options.html"
+}
