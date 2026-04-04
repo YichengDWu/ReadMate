@@ -11,6 +11,7 @@ const DEFAULT_SETTINGS = {
   languageFilter: "",
   enableWordHighlight: true,
   autoPlayOnSelection: false,
+  keepPlayerVisibleAfterPlayback: false,
   translationEnabled: false,
   translationTargetLanguage: "",
   translationApiUrl: DEFAULT_TRANSLATION_API_URL,
@@ -31,6 +32,7 @@ const normalizationSelect = document.getElementById("applyTextNormalization");
 const audioEncodingSelect = document.getElementById("audioEncoding");
 const enableWordHighlightInput = document.getElementById("enableWordHighlight");
 const autoPlayOnSelectionInput = document.getElementById("autoPlayOnSelection");
+const keepPlayerVisibleAfterPlaybackInput = document.getElementById("keepPlayerVisibleAfterPlayback");
 const translationEnabledInput = document.getElementById("translationEnabled");
 const translationTargetLanguageInput = document.getElementById("translationTargetLanguage");
 const translationApiUrlInput = document.getElementById("translationApiUrl");
@@ -112,6 +114,7 @@ async function loadSettingsIntoForm() {
   audioEncodingSelect.value = merged.audioEncoding;
   enableWordHighlightInput.checked = Boolean(merged.enableWordHighlight);
   autoPlayOnSelectionInput.checked = Boolean(merged.autoPlayOnSelection);
+  keepPlayerVisibleAfterPlaybackInput.checked = Boolean(merged.keepPlayerVisibleAfterPlayback);
   translationEnabledInput.checked = Boolean(merged.translationEnabled);
   translationTargetLanguageInput.value = merged.translationTargetLanguage;
   translationApiUrlInput.value = merged.translationApiUrl || DEFAULT_TRANSLATION_API_URL;
@@ -133,6 +136,7 @@ function collectSettingsFromForm() {
     audioEncoding: audioEncodingSelect.value,
     enableWordHighlight: enableWordHighlightInput.checked,
     autoPlayOnSelection: autoPlayOnSelectionInput.checked,
+    keepPlayerVisibleAfterPlayback: keepPlayerVisibleAfterPlaybackInput.checked,
     translationEnabled: translationEnabledInput.checked,
     translationTargetLanguage: translationTargetLanguageInput.value.trim(),
     translationApiUrl: translationApiUrlInput.value.trim() || DEFAULT_TRANSLATION_API_URL,

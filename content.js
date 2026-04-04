@@ -4,6 +4,7 @@ const LOOKAHEAD_WINDOW = 4;
 const AUTO_PLAY_DELAY_MS = 260;
 const CONTENT_DEFAULT_SETTINGS = {
   autoPlayOnSelection: false,
+  keepPlayerVisibleAfterPlayback: false,
   translationEnabled: false,
   translationTargetLanguage: "",
   uiLanguage: InworldI18n.getInitialUiLanguage(),
@@ -27,6 +28,7 @@ let activeWordIndex = -1;
 let isBusy = false;
 let isPlaying = false;
 let isPaused = false;
+let hasCompletedPlayback = false;
 let isDraggingPlayer = false;
 let isSeeking = false;
 let extensionContextLost = false;
@@ -201,6 +203,11 @@ document.addEventListener("mousedown", (event) => {
 
 miniPlayerPlayPauseButton.addEventListener("click", () => {
   if (isBusy || !audioElement) {
+    return;
+  }
+
+  if (hasCompletedPlayback) {
+    void replayPlayback();
     return;
   }
 
@@ -492,9 +499,20 @@ async function playAudioPayload(payload) {
     translationApplied: Boolean(payload.translationApplied),
     translationTargetLanguage: payload.translationTargetLanguage || "",
     pendingTranslation: false,
+    timestampInfo: payload.timestampInfo ?? null,
   };
+  hasCompletedPlayback = false;
 
   audioElement.addEventListener("ended", () => {
+    if (shouldKeepPlayerVisibleAfterPlayback()) {
+      completePlaybackState();
+      stopWordHighlightSync({ restoreInputSelection: true });
+      updateSelectionState();
+      hideBubble();
+      updateMiniPlayer();
+      return;
+    }
+
     resetPlaybackState();
     stopWordHighlightSync({ restoreInputSelection: true });
     updateSelectionState();
@@ -541,6 +559,7 @@ function resetPlaybackState(options = {}) {
   const { preservePlayer = false } = options;
   isPlaying = false;
   isPaused = false;
+  hasCompletedPlayback = false;
   stopMiniPlayerSync();
   if (audioElement) {
     audioElement.src = "";
@@ -969,8 +988,10 @@ function setMiniPlayerLoadingState(text, options = {}) {
     translationApplied: false,
     translationTargetLanguage,
     pendingTranslation,
+    timestampInfo: null,
   };
   isPaused = false;
+  hasCompletedPlayback = false;
   showMiniPlayer();
   hideBubble();
   miniPlayerTitle.textContent = t("common.miniPlayerTitle");
@@ -1006,6 +1027,12 @@ function updateMiniPlayer() {
           language: currentPlaybackMeta.translationTargetLanguage,
         })
       : t("content.playerStatusLoading")
+    : hasCompletedPlayback
+      ? isTranslatedPlayback
+        ? t("content.playerStatusFinishedTranslated", {
+            language: currentPlaybackMeta.translationTargetLanguage,
+          })
+        : t("content.playerStatusFinished")
     : isPaused
       ? isTranslatedPlayback
         ? t("content.playerStatusPausedTranslated", {
@@ -1021,13 +1048,19 @@ function updateMiniPlayer() {
         : t("content.playerStatusWaiting");
   miniPlayerChip.textContent = isBusy
     ? t("content.playerChipLoading")
+    : hasCompletedPlayback
+      ? t("content.playerChipFinished")
     : isPaused
       ? t("content.playerChipPaused")
       : isPlaying
         ? t("content.playerChipPlaying")
         : t("content.playerChipReady");
   miniPlayerText.textContent = buildMiniPlayerText(currentPlaybackMeta);
-  miniPlayerPlayPauseButton.textContent = isPaused ? t("content.resume") : t("content.pause");
+  miniPlayerPlayPauseButton.textContent = hasCompletedPlayback
+    ? t("content.replay")
+    : isPaused
+      ? t("content.resume")
+      : t("content.pause");
   miniPlayerPlayPauseButton.disabled = isBusy || !audioElement;
   miniPlayerStopButton.textContent = t("content.stop");
   miniPlayerStopButton.disabled = isBusy && !audioElement;
@@ -1119,6 +1152,7 @@ function pausePlayback() {
 
   audioElement.pause();
   isPaused = true;
+  hasCompletedPlayback = false;
   stopMiniPlayerSync();
   updateMiniPlayer();
 }
@@ -1131,10 +1165,43 @@ async function resumePlayback() {
   try {
     await audioElement.play();
     isPaused = false;
+    hasCompletedPlayback = false;
     updateMiniPlayer();
     startMiniPlayerSync();
   } catch (_error) {
     showToast(t("content.resumePlaybackFailed"));
+  }
+}
+
+function completePlaybackState() {
+  isPlaying = false;
+  isPaused = false;
+  hasCompletedPlayback = true;
+  stopMiniPlayerSync();
+}
+
+async function replayPlayback() {
+  if (!audioElement || !hasCompletedPlayback) {
+    return;
+  }
+
+  try {
+    audioElement.currentTime = 0;
+    await audioElement.play();
+    isPlaying = true;
+    isPaused = false;
+    hasCompletedPlayback = false;
+    startWordHighlightSync(currentPlaybackMeta?.timestampInfo);
+    hideBubble();
+    updateButtonState({
+      label: t("content.stop"),
+      detail: buildPlaybackDetail(currentPlaybackMeta ?? {}),
+      disabled: false,
+    });
+    updateMiniPlayer();
+    startMiniPlayerSync();
+  } catch (_error) {
+    showToast(t("content.replayPlaybackFailed"));
   }
 }
 
@@ -1201,6 +1268,10 @@ function isTranslationEnabled() {
     contentSettings.translationEnabled &&
     String(contentSettings.translationTargetLanguage ?? "").trim(),
   );
+}
+
+function shouldKeepPlayerVisibleAfterPlayback() {
+  return Boolean(contentSettings.keepPlayerVisibleAfterPlayback);
 }
 
 function getSpeakActionLabel() {
