@@ -12,6 +12,12 @@
     "https://api.inworld.ai/*",
     "<all_urls>"
   ],
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
   "background": {
     "service_worker": "background.js"
   },
@@ -32,6 +38,11 @@
   ],
   "action": {
     "default_title": "Inworld Selection TTS",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png"
+    },
     "default_popup": "popup.html"
   },
   "options_page": "options.html"
