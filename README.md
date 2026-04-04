@@ -6,6 +6,9 @@ A Chrome / Edge Manifest V3 extension that reads selected text aloud with Inworl
 
 Disclaimer: this project was vibe coded with Codex.
 
+License: MIT. See [LICENSE](./LICENSE).
+Privacy & permissions: see [PRIVACY.md](./PRIVACY.md).
+
 ## Features
 
 - Shows a floating speak button after text selection
@@ -43,10 +46,10 @@ Disclaimer: this project was vibe coded with Codex.
    - Edge: `edge://extensions`
 3. Turn on Developer Mode.
 4. Click "Load unpacked".
-5. Select this directory:
+5. Select the project directory you just cloned or downloaded:
 
 ```text
-/Users/yichengwu/ethan/inworld-selection-tts-extension
+/path/to/inworld-selection-tts-extension
 ```
 
 ## Initial Setup
@@ -97,3 +100,5 @@ This implementation is best suited for personal use:
 - Secrets are not written into repository files
 
 If you plan to distribute this extension publicly, it is safer to move API access behind your own backend instead of shipping shared secrets directly to clients.
+
+For a publish-ready summary of permissions and data flow, see [PRIVACY.md](./PRIVACY.md).

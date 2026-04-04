@@ -6,6 +6,9 @@
 
 免责声明：本项目是使用 Codex vibe code 出来的。
 
+许可证：MIT。见 [LICENSE](./LICENSE)。
+隐私与权限说明：见 [PRIVACY.md](./PRIVACY.md)。
+
 ## 功能
 
 - 划词后显示悬浮“朗读”按钮
@@ -43,10 +46,10 @@
    - Edge: `edge://extensions`
 3. 打开“开发者模式”。
 4. 选择“加载已解压的扩展程序”。
-5. 选中当前目录：
+5. 选择你刚刚克隆或下载下来的项目目录：
 
 ```text
-/Users/yichengwu/ethan/inworld-selection-tts-extension
+/path/to/inworld-selection-tts-extension
 ```
 
 ## 首次配置
@@ -97,3 +100,5 @@ Authorization: Basic <YOUR_INWORLD_API_KEY>
 - 密钥不会写入仓库文件
 
 如果你要把扩展公开分发给其他人，建议改成服务端代理模式，不要把共享 API Key 直接交给客户端。
+
+如果你准备发布这个项目，也可以把 [PRIVACY.md](./PRIVACY.md) 一起放到仓库首页说明里。
