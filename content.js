@@ -38,13 +38,38 @@ let playerDragOffsetY = 0;
 let lastAutoPlaySelectionKey = "";
 let contentSettings = { ...CONTENT_DEFAULT_SETTINGS };
 
+const SPEAKER_ICON_SVG =
+  '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+  '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"></polygon>' +
+  '<path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>' +
+  '<path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>' +
+  "</svg>";
+
+const LOADING_ICON_SVG =
+  '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inworld-spin">' +
+  '<path d="M21 12a9 9 0 1 1-6.219-8.56"></path>' +
+  "</svg>";
+
+const STOP_ICON_SVG =
+  '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">' +
+  '<rect x="5" y="5" width="14" height="14" rx="2"></rect>' +
+  "</svg>";
+
+const REFRESH_ICON_SVG =
+  '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+  '<polyline points="23 4 23 10 17 10"></polyline>' +
+  '<path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>' +
+  "</svg>";
+
 const bubble = document.createElement("div");
 bubble.id = "inworld-tts-bubble";
 
 const actionButton = document.createElement("button");
 actionButton.id = "inworld-tts-button";
 actionButton.type = "button";
-actionButton.textContent = t("content.speakAction");
+actionButton.innerHTML = SPEAKER_ICON_SVG;
+actionButton.title = t("content.speakAction");
+actionButton.setAttribute("aria-label", t("content.speakAction"));
 
 const meta = document.createElement("div");
 meta.id = "inworld-tts-meta";
@@ -366,7 +391,11 @@ function readSelection() {
   }
 
   const range = selection.getRangeAt(0);
-  const rect = range.getBoundingClientRect();
+  const clientRects = Array.from(range.getClientRects()).filter(
+    (r) => r.width > 0 && r.height > 0,
+  );
+  const lastRect = clientRects.length > 0 ? clientRects[clientRects.length - 1] : null;
+  const rect = lastRect || range.getBoundingClientRect();
   if (rect.width || rect.height) {
     return {
       text,
@@ -1315,10 +1344,26 @@ function buildPlaybackDetail(payload) {
   });
 }
 
-function updateButtonState({ label, detail, disabled }) {
-  actionButton.textContent = label;
+function updateButtonState({ label, detail, disabled, icon }) {
   actionButton.disabled = Boolean(disabled);
-  metaBody.textContent = detail;
+  actionButton.title = detail ? `${label} - ${detail}` : (label || "");
+  actionButton.setAttribute("aria-label", label || t("content.speakAction"));
+
+  if (icon === "loading" || isBusy) {
+    actionButton.innerHTML = LOADING_ICON_SVG;
+    actionButton.style.cursor = "wait";
+  } else if (icon === "stop" || isPlaying) {
+    actionButton.innerHTML = STOP_ICON_SVG;
+    actionButton.style.cursor = "pointer";
+  } else if (icon === "refresh" || extensionContextLost) {
+    actionButton.innerHTML = REFRESH_ICON_SVG;
+    actionButton.style.cursor = "not-allowed";
+  } else {
+    actionButton.innerHTML = SPEAKER_ICON_SVG;
+    actionButton.style.cursor = disabled ? "not-allowed" : "pointer";
+  }
+
+  metaBody.textContent = detail || "";
 }
 
 function showBubble(rect) {
@@ -1327,13 +1372,18 @@ function showBubble(rect) {
     return;
   }
 
-  const bubbleWidth = 220;
-  const gap = 10;
-  const left = Math.min(
-    window.scrollX + window.innerWidth - bubbleWidth - 12,
-    Math.max(window.scrollX + 12, window.scrollX + rect.right - bubbleWidth / 2),
+  const iconSize = 30;
+  const gap = 6;
+  let left = window.scrollX + rect.right - 14;
+  left = Math.min(
+    window.scrollX + window.innerWidth - iconSize - 12,
+    Math.max(window.scrollX + 12, left),
   );
-  const top = Math.max(window.scrollY + 12, window.scrollY + rect.bottom + gap);
+
+  let top = window.scrollY + rect.bottom + gap;
+  if (top + iconSize + 12 > window.scrollY + window.innerHeight && rect.top - iconSize - gap > 0) {
+    top = Math.max(window.scrollY + 12, window.scrollY + rect.top - iconSize - gap);
+  }
 
   bubble.style.left = `${left}px`;
   bubble.style.top = `${top}px`;
@@ -1408,7 +1458,9 @@ function handleExtensionContextLoss() {
   hideBubble();
   hideMiniPlayer();
   actionButton.disabled = true;
-  actionButton.textContent = t("content.pageRefreshAction");
+  actionButton.title = t("content.pageRefreshAction");
+  actionButton.setAttribute("aria-label", t("content.pageRefreshAction"));
+  actionButton.innerHTML = REFRESH_ICON_SVG;
   metaBody.textContent = t("content.extensionReloadedReadyMessage");
   showToast(t("content.extensionReloadedToast"));
 }
@@ -1486,7 +1538,9 @@ function refreshLocalizedUi() {
 
   if (extensionContextLost) {
     actionButton.disabled = true;
-    actionButton.textContent = t("content.pageRefreshAction");
+    actionButton.title = t("content.pageRefreshAction");
+    actionButton.setAttribute("aria-label", t("content.pageRefreshAction"));
+    actionButton.innerHTML = REFRESH_ICON_SVG;
     metaBody.textContent = t("content.extensionReloadedReadyMessage");
     return;
   }
