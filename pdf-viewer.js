@@ -327,76 +327,146 @@
     );
   }
 
+  async function getPageText(pageNum) {
+    if (!currentPdfDoc || pageNum < 1 || pageNum > totalPages) return "";
+    try {
+      const page = await currentPdfDoc.getPage(pageNum);
+      const textContent = await page.getTextContent();
+      return textContent.items.map((item) => item.str).join(" ").trim();
+    } catch (err) {
+      console.warn("Failed to extract page text for page " + pageNum, err);
+      return "";
+    }
+  }
+
+  async function findNextPlayablePage(fromPage) {
+    let checkPage = fromPage;
+    let emptyCount = 0;
+
+    while (checkPage <= totalPages) {
+      const text = (checkPage === currentPageNumber && currentPageText)
+        ? currentPageText.trim()
+        : (await getPageText(checkPage)).trim();
+
+      if (text) {
+        return { pageNum: checkPage, text, emptySkipped: emptyCount };
+      }
+
+      emptyCount++;
+      if (emptyCount >= 3) {
+        return null;
+      }
+      checkPage++;
+    }
+
+    return null;
+  }
+
   async function runContinuousReadingLoop(startPage, sessionId) {
-    let pageNum = startPage;
-    let consecutiveEmptyPages = 0;
+    let currentPlayable = await findNextPlayablePage(startPage);
 
-    while (isContinuousReading && sessionId === continuousSessionId && pageNum <= totalPages) {
-      updateContinuousProgress(pageNum);
+    if (!currentPlayable) {
+      showStatus(t("pdf.noTextOnPage", "未检测到可朗读的文本。"));
+      setTimeout(hideStatus, 2000);
+      stopContinuousReading();
+      return;
+    }
 
-      // Render page if not already showing
-      if (currentPageNumber !== pageNum) {
-        await renderPage(pageNum);
-        document.getElementById("viewer-container").scrollTo({ top: 0, behavior: "smooth" });
-      }
+    if (currentPlayable.pageNum !== currentPageNumber) {
+      await renderPage(currentPlayable.pageNum);
+      document.getElementById("viewer-container").scrollTo({ top: 0, behavior: "smooth" });
+    }
 
-      const text = currentPageText ? currentPageText.trim() : "";
-      if (!text) {
-        consecutiveEmptyPages++;
-        if (consecutiveEmptyPages >= 3) {
-          showStatus(t("pdf.noTextOnPage", "连续多页无文本，已停止朗读。"));
-          setTimeout(hideStatus, 2000);
-          break;
-        }
+    updateContinuousProgress(currentPlayable.pageNum);
 
-        showStatus(t("pdf.skippingBlankPage", `第 ${pageNum} 页无文本，自动跳过...`, { page: pageNum }));
-        await new Promise((r) => setTimeout(r, 800));
+    let chunks = splitTextIntoChunks(currentPlayable.text, 1500);
+    let chunkIndex = 0;
+
+    // Prefetch first chunk of the first page
+    let nextAudioPromise = fetchAudioPayload(chunks[0], sessionId);
+
+    while (isContinuousReading && sessionId === continuousSessionId) {
+      // 1. Await the pre-synthesized audio for current chunk
+      let currentPayload = null;
+      try {
+        // If not ready yet, show brief loading status
+        showStatus(t("content.loadingSpeechLabel", "正在合成语音..."));
+        currentPayload = await nextAudioPromise;
         hideStatus();
-        pageNum++;
-        continue;
-      }
-
-      consecutiveEmptyPages = 0;
-      const chunks = splitTextIntoChunks(text, 1500);
-
-      let pageOk = true;
-      for (let i = 0; i < chunks.length; i++) {
-        if (!isContinuousReading || sessionId !== continuousSessionId) {
-          pageOk = false;
-          break;
-        }
-
-        try {
-          showStatus(t("content.loadingSpeechLabel", "正在合成语音..."));
-          const finished = await playTextChunk(chunks[i], sessionId);
-          hideStatus();
-          if (!finished) {
-            pageOk = false;
-            break;
-          }
-        } catch (err) {
-          hideStatus();
-          console.error("Continuous reading error on page " + pageNum + ":", err);
-          alert(err.message);
-          pageOk = false;
-          break;
-        }
-      }
-
-      if (!pageOk || !isContinuousReading || sessionId !== continuousSessionId) {
+      } catch (err) {
+        hideStatus();
+        console.error("Audio synthesis failed:", err);
+        alert(err.message || "Speech synthesis failed");
         break;
       }
 
-      // Turn to next page automatically!
-      if (pageNum < totalPages) {
-        pageNum++;
-        // Small pause between pages for pleasant reading cadence
-        await new Promise((r) => setTimeout(r, 400));
+      if (!isContinuousReading || sessionId !== continuousSessionId || !currentPayload) {
+        break;
+      }
+
+      // 2. WHILE CURRENT CHUNK IS PLAYING, IMMEDIATELY PREFETCH THE NEXT CHUNK!
+      const isLastChunkOfCurrentPage = (chunkIndex + 1 >= chunks.length);
+      const currentPlayingPage = currentPlayable.pageNum;
+
+      if (!isLastChunkOfCurrentPage) {
+        // Next chunk is on the same page
+        nextAudioPromise = fetchAudioPayload(chunks[chunkIndex + 1], sessionId);
+      } else if (currentPlayingPage < totalPages) {
+        // Last chunk of this page -> look ahead to next playable page and prefetch its first chunk!
+        nextAudioPromise = (async () => {
+          if (!isContinuousReading || sessionId !== continuousSessionId) return null;
+          const nextPlayable = await findNextPlayablePage(currentPlayingPage + 1);
+          if (!nextPlayable) return null;
+          const nextChunks = splitTextIntoChunks(nextPlayable.text, 1500);
+          if (!nextChunks.length) return null;
+          return fetchAudioPayload(nextChunks[0], sessionId);
+        })();
       } else {
-        // Last page completed
-        showStatus(t("pdf.readingCompleted", "全书已朗读完成。"));
-        setTimeout(hideStatus, 3000);
+        nextAudioPromise = Promise.resolve(null);
+      }
+
+      // 3. Play current chunk audio
+      try {
+        const finished = await playAudioPayload(currentPayload, sessionId);
+        if (!finished || !isContinuousReading || sessionId !== continuousSessionId) {
+          break;
+        }
+      } catch (playErr) {
+        console.error("Playback error:", playErr);
         break;
+      }
+
+      // 4. Chunk playback ended. Advance pointer!
+      if (!isLastChunkOfCurrentPage) {
+        chunkIndex++;
+      } else {
+        // Turn to next page!
+        if (currentPlayingPage >= totalPages) {
+          showStatus(t("pdf.readingCompleted", "全书已朗读完成。"));
+          setTimeout(hideStatus, 3000);
+          break;
+        }
+
+        const nextPlayable = await findNextPlayablePage(currentPlayingPage + 1);
+        if (!nextPlayable) {
+          showStatus(t("pdf.readingCompleted", "全书已朗读完成。"));
+          setTimeout(hideStatus, 3000);
+          break;
+        }
+
+        if (nextPlayable.emptySkipped > 0) {
+          showStatus(t("pdf.skippingBlankPage", `自动跳过空白页...`));
+          setTimeout(hideStatus, 1000);
+        }
+
+        currentPlayable = nextPlayable;
+        chunks = splitTextIntoChunks(currentPlayable.text, 1500);
+        chunkIndex = 0;
+
+        // Render next page and smooth scroll to top
+        await renderPage(currentPlayable.pageNum);
+        document.getElementById("viewer-container").scrollTo({ top: 0, behavior: "smooth" });
+        updateContinuousProgress(currentPlayable.pageNum);
       }
     }
 
@@ -441,35 +511,42 @@
     return chunks.length ? chunks : [trimmed.slice(0, maxChars)];
   }
 
-  function playTextChunk(chunkText, sessionId) {
+  async function fetchAudioPayload(chunkText, sessionId) {
+    if (!isContinuousReading || sessionId !== continuousSessionId) {
+      return null;
+    }
+
+    const response = await chrome.runtime.sendMessage({
+      type: "SPEAK_TEXT",
+      text: chunkText,
+    });
+
+    if (!isContinuousReading || sessionId !== continuousSessionId) {
+      return null;
+    }
+
+    if (!response?.ok) {
+      throw new Error(response?.error || "Speech synthesis failed");
+    }
+
+    const audioContent = response.result?.audioContent;
+    const mimeType = response.result?.mimeType || "audio/wav";
+    if (!audioContent) {
+      throw new Error("No audio content received");
+    }
+
+    return { audioContent, mimeType };
+  }
+
+  function playAudioPayload(payload, sessionId) {
     return new Promise(async (resolve, reject) => {
-      if (!isContinuousReading || sessionId !== continuousSessionId) {
+      if (!isContinuousReading || sessionId !== continuousSessionId || !payload) {
         resolve(false);
         return;
       }
 
       try {
-        const response = await chrome.runtime.sendMessage({
-          type: "SPEAK_TEXT",
-          text: chunkText,
-        });
-
-        if (!isContinuousReading || sessionId !== continuousSessionId) {
-          resolve(false);
-          return;
-        }
-
-        if (!response?.ok) {
-          throw new Error(response?.error || "Speech synthesis failed");
-        }
-
-        const audioContent = response.result?.audioContent;
-        const mimeType = response.result?.mimeType || "audio/wav";
-        if (!audioContent) {
-          throw new Error("No audio content received");
-        }
-
-        const audio = new Audio(`data:${mimeType};base64,${audioContent}`);
+        const audio = new Audio(`data:${payload.mimeType};base64,${payload.audioContent}`);
         activeContinuousAudio = audio;
 
         audio.addEventListener("ended", () => {
@@ -507,11 +584,25 @@
     readContinuousBtn.disabled = true;
 
     try {
-      for (const chunk of chunks) {
-        if (sessionId !== continuousSessionId) break;
+      let nextAudioPromise = fetchAudioPayload(chunks[0], sessionId);
+
+      for (let i = 0; i < chunks.length; i++) {
+        if (sessionId !== continuousSessionId || !isContinuousReading) break;
+
         showStatus(t("content.loadingSpeechLabel", "正在合成语音..."));
-        const finished = await playTextChunk(chunk, sessionId);
+        const payload = await nextAudioPromise;
         hideStatus();
+
+        if (!payload || sessionId !== continuousSessionId || !isContinuousReading) break;
+
+        // Prefetch next chunk while current is playing
+        if (i + 1 < chunks.length) {
+          nextAudioPromise = fetchAudioPayload(chunks[i + 1], sessionId);
+        } else {
+          nextAudioPromise = Promise.resolve(null);
+        }
+
+        const finished = await playAudioPayload(payload, sessionId);
         if (!finished) break;
       }
     } catch (err) {
