@@ -27,11 +27,9 @@ const MAX_TEXT_LENGTH = 2000;
 const INWORLD_TTS_URL = "https://api.inworld.ai/tts/v1/voice";
 const INWORLD_VOICES_URL = "https://api.inworld.ai/voices/v1/voices";
 
-void initializeBackgroundUi();
-
 chrome.runtime.onInstalled.addListener(async () => {
   const settings = await ensureSettings();
-  await refreshExtensionUi(settings);
+  await refreshExtensionUi(settings, true);
 });
 
 chrome.runtime.onStartup.addListener(async () => {
@@ -44,12 +42,16 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     return;
   }
 
-  const settings = {
-    ...DEFAULT_SETTINGS,
-    ...(changes.settings.newValue ?? {}),
-  };
+  const oldLang = changes.settings.oldValue?.uiLanguage;
+  const newLang = changes.settings.newValue?.uiLanguage;
 
-  void refreshExtensionUi(settings);
+  if (oldLang !== newLang) {
+    const settings = {
+      ...DEFAULT_SETTINGS,
+      ...(changes.settings.newValue ?? {}),
+    };
+    void refreshExtensionUi(settings);
+  }
 });
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
@@ -92,11 +94,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   return true;
 });
-
-async function initializeBackgroundUi() {
-  const settings = await ensureSettings();
-  await refreshExtensionUi(settings);
-}
 
 async function handleMessage(message) {
   switch (message?.type) {
@@ -142,7 +139,10 @@ async function getSettings() {
   return { ...DEFAULT_SETTINGS, ...(settings ?? {}) };
 }
 
-async function refreshExtensionUi(settings) {
+let currentContextMenuLanguage = null;
+let isRebuildingContextMenu = false;
+
+async function refreshExtensionUi(settings, force = false) {
   const language = getUiLanguage(settings);
 
   try {
@@ -153,19 +153,35 @@ async function refreshExtensionUi(settings) {
     // ignore action title update failures
   }
 
-  await rebuildContextMenu(language);
+  await rebuildContextMenu(language, force);
 }
 
-function rebuildContextMenu(language) {
+function rebuildContextMenu(language, force = false) {
+  if (!force && currentContextMenuLanguage === language) {
+    return Promise.resolve();
+  }
+
+  if (isRebuildingContextMenu) {
+    return Promise.resolve();
+  }
+  isRebuildingContextMenu = true;
+
   return new Promise((resolve) => {
     chrome.contextMenus.removeAll(() => {
+      void chrome.runtime.lastError;
+
       chrome.contextMenus.create(
         {
           id: CONTEXT_MENU_ID,
           title: t(language, "background.contextMenuSpeakSelection"),
           contexts: ["selection"],
         },
-        () => resolve(),
+        () => {
+          void chrome.runtime.lastError;
+          currentContextMenuLanguage = language;
+          isRebuildingContextMenu = false;
+          resolve();
+        },
       );
     });
   });
