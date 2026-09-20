@@ -10,6 +10,7 @@
   ],
   "host_permissions": [
     "https://api.inworld.ai/*",
+    "https://api.cartesia.ai/*",
     "<all_urls>"
   ],
   "icons": {

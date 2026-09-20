@@ -33,93 +33,148 @@
             </select>
           </label>
 
-          <label class="field field-full">
-            <span data-i18n="options.apiKeyLabel">Inworld API Key</span>
-            <input
-              id="apiKey"
-              name="apiKey"
-              type="password"
-              autocomplete="off"
-              data-i18n-placeholder="options.apiKeyPlaceholder"
-              placeholder="Enter your Inworld API key"
-              required
-            />
-          </label>
-
           <label class="field">
-            <span data-i18n="options.voiceIdLabel">Voice ID</span>
-            <input
-              id="voiceId"
-              name="voiceId"
-              type="text"
-              autocomplete="off"
-              data-i18n-placeholder="options.voiceIdPlaceholder"
-              placeholder="For example: Alex or your custom voiceId"
-              required
-            />
-          </label>
-
-          <label class="field">
-            <span data-i18n="options.modelLabel">Model</span>
-            <select id="modelId" name="modelId">
-              <option value="inworld-tts-1.5-mini">inworld-tts-1.5-mini</option>
-              <option value="inworld-tts-1.5-max">inworld-tts-1.5-max</option>
+            <span data-i18n="options.providerLabel">TTS Provider</span>
+            <select id="ttsProvider" name="provider">
+              <option value="inworld" data-i18n="options.providerInworld">Inworld AI</option>
+              <option value="cartesia" data-i18n="options.providerCartesia">Cartesia AI (Sonic 3.6)</option>
             </select>
           </label>
 
-          <label class="field">
-            <span data-i18n="options.languageFilterLabel">Language filter</span>
-            <input
-              id="languageFilter"
-              name="languageFilter"
-              type="text"
-              autocomplete="off"
-              data-i18n-placeholder="options.languageFilterPlaceholder"
-              placeholder="Optional, comma-separated, for example: zh,en"
-            />
-          </label>
+          <div id="inworldSettingsGroup" class="provider-group">
+            <label class="field field-full">
+              <span data-i18n="options.apiKeyLabel">Inworld API Key</span>
+              <input
+                id="apiKey"
+                name="apiKey"
+                type="password"
+                autocomplete="off"
+                data-i18n-placeholder="options.apiKeyPlaceholder"
+                placeholder="Enter your Inworld API key"
+              />
+            </label>
 
-          <label class="field">
-            <span data-i18n="options.sampleRateLabel">Sample rate</span>
-            <input
-              id="sampleRateHertz"
-              name="sampleRateHertz"
-              type="number"
-              min="8000"
-              step="1"
-              value="22050"
-            />
-          </label>
+            <label class="field">
+              <span data-i18n="options.voiceIdLabel">Voice ID</span>
+              <input
+                id="voiceId"
+                name="voiceId"
+                type="text"
+                autocomplete="off"
+                data-i18n-placeholder="options.voiceIdPlaceholder"
+                placeholder="For example: Alex or your custom voiceId"
+              />
+            </label>
 
-          <label class="field">
-            <span data-i18n="options.temperatureLabel">Temperature</span>
-            <input
-              id="temperature"
-              name="temperature"
-              type="number"
-              min="0.1"
-              max="2"
-              step="0.1"
-              value="1"
-            />
-          </label>
+            <label class="field">
+              <span data-i18n="options.modelLabel">Model</span>
+              <select id="modelId" name="modelId">
+                <option value="inworld-tts-1.5-mini">inworld-tts-1.5-mini</option>
+                <option value="inworld-tts-1.5-max">inworld-tts-1.5-max</option>
+              </select>
+            </label>
 
-          <label class="field">
-            <span data-i18n="options.textNormalizationLabel">Text normalization</span>
-            <select id="applyTextNormalization" name="applyTextNormalization">
-              <option value="ON">ON</option>
-              <option value="OFF">OFF</option>
-            </select>
-          </label>
+            <label class="field">
+              <span data-i18n="options.languageFilterLabel">Language filter</span>
+              <input
+                id="languageFilter"
+                name="languageFilter"
+                type="text"
+                autocomplete="off"
+                data-i18n-placeholder="options.languageFilterPlaceholder"
+                placeholder="Optional, comma-separated, for example: zh,en"
+              />
+            </label>
 
-          <label class="field">
-            <span data-i18n="options.audioEncodingLabel">Audio encoding</span>
-            <select id="audioEncoding" name="audioEncoding">
-              <option value="LINEAR16">LINEAR16 (WAV)</option>
-              <option value="MP3">MP3</option>
-              <option value="OGG_OPUS">OGG_OPUS</option>
-            </select>
-          </label>
+            <label class="field">
+              <span data-i18n="options.sampleRateLabel">Sample rate</span>
+              <input
+                id="sampleRateHertz"
+                name="sampleRateHertz"
+                type="number"
+                min="8000"
+                step="1"
+                value="22050"
+              />
+            </label>
+
+            <label class="field">
+              <span data-i18n="options.temperatureLabel">Temperature</span>
+              <input
+                id="temperature"
+                name="temperature"
+                type="number"
+                min="0.1"
+                max="2"
+                step="0.1"
+                value="1"
+              />
+            </label>
+
+            <label class="field">
+              <span data-i18n="options.textNormalizationLabel">Text normalization</span>
+              <select id="applyTextNormalization" name="applyTextNormalization">
+                <option value="ON">ON</option>
+                <option value="OFF">OFF</option>
+              </select>
+            </label>
+
+            <label class="field field-full">
+              <span data-i18n="options.audioEncodingLabel">Audio encoding</span>
+              <select id="audioEncoding" name="audioEncoding">
+                <option value="LINEAR16">LINEAR16 (WAV)</option>
+                <option value="MP3">MP3</option>
+                <option value="OGG_OPUS">OGG_OPUS</option>
+              </select>
+            </label>
+          </div>
+
+          <div id="cartesiaSettingsGroup" class="provider-group is-hidden">
+            <label class="field field-full">
+              <span data-i18n="options.cartesiaApiKeyLabel">Cartesia API Key</span>
+              <input
+                id="cartesiaApiKey"
+                name="cartesiaApiKey"
+                type="password"
+                autocomplete="off"
+                data-i18n-placeholder="options.cartesiaApiKeyPlaceholder"
+                placeholder="Enter your Cartesia API key"
+              />
+            </label>
+
+            <label class="field">
+              <span data-i18n="options.cartesiaVoiceIdLabel">Cartesia Voice ID</span>
+              <input
+                id="cartesiaVoiceId"
+                name="cartesiaVoiceId"
+                type="text"
+                autocomplete="off"
+                data-i18n-placeholder="options.cartesiaVoiceIdPlaceholder"
+                placeholder="For example: db6b0ed5-d5d3-463d-ae85-518a07d3c2b4"
+              />
+            </label>
+
+            <label class="field">
+              <span data-i18n="options.cartesiaModelLabel">Cartesia Model</span>
+              <select id="cartesiaModelId" name="cartesiaModelId">
+                <option value="sonic-3.6">sonic-3.6 (Latest & Recommended)</option>
+                <option value="sonic-preview">sonic-preview (Beta)</option>
+                <option value="sonic-3.5">sonic-3.5</option>
+              </select>
+            </label>
+
+            <label class="field field-full">
+              <span data-i18n="options.cartesiaLanguageLabel">Language/Locale hint (Optional)</span>
+              <input
+                id="cartesiaLanguage"
+                name="cartesiaLanguage"
+                type="text"
+                autocomplete="off"
+                data-i18n-placeholder="options.cartesiaLanguagePlaceholder"
+                placeholder="For example: en, zh, ja, or leave empty"
+              />
+            </label>
+          </div>
 
           <label class="field field-full checkbox-field">
             <span class="checkbox-row">

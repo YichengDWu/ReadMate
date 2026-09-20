@@ -1,6 +1,15 @@
 const DEFAULT_TRANSLATION_API_URL = "https://api.openai.com/v1/chat/completions";
 
 const DEFAULT_SETTINGS = {
+  provider: "inworld",
+  inworldApiKey: "",
+  inworldVoiceId: "",
+  inworldModelId: "inworld-tts-1.5-mini",
+  cartesiaApiKey: "",
+  cartesiaVoiceId: "",
+  cartesiaModelId: "sonic-3.6",
+  cartesiaLanguage: "",
+  // Legacy aliases for backward compatibility
   apiKey: "",
   voiceId: "",
   modelId: "inworld-tts-1.5-mini",
@@ -22,6 +31,10 @@ const DEFAULT_SETTINGS = {
 
 const form = document.getElementById("settings-form");
 const uiLanguageInput = document.getElementById("uiLanguage");
+const ttsProviderSelect = document.getElementById("ttsProvider");
+const inworldSettingsGroup = document.getElementById("inworldSettingsGroup");
+const cartesiaSettingsGroup = document.getElementById("cartesiaSettingsGroup");
+
 const apiKeyInput = document.getElementById("apiKey");
 const voiceIdInput = document.getElementById("voiceId");
 const modelSelect = document.getElementById("modelId");
@@ -30,6 +43,12 @@ const sampleRateInput = document.getElementById("sampleRateHertz");
 const temperatureInput = document.getElementById("temperature");
 const normalizationSelect = document.getElementById("applyTextNormalization");
 const audioEncodingSelect = document.getElementById("audioEncoding");
+
+const cartesiaApiKeyInput = document.getElementById("cartesiaApiKey");
+const cartesiaVoiceIdInput = document.getElementById("cartesiaVoiceId");
+const cartesiaModelSelect = document.getElementById("cartesiaModelId");
+const cartesiaLanguageInput = document.getElementById("cartesiaLanguage");
+
 const enableWordHighlightInput = document.getElementById("enableWordHighlight");
 const autoPlayOnSelectionInput = document.getElementById("autoPlayOnSelection");
 const keepPlayerVisibleAfterPlaybackInput = document.getElementById("keepPlayerVisibleAfterPlayback");
@@ -68,6 +87,14 @@ async function initialize() {
     await loadVoices();
   });
 
+  ttsProviderSelect.addEventListener("change", () => {
+    updateProviderVisibility();
+    loadedVoices = [];
+    hasLoadedVoices = false;
+    voiceSelect.innerHTML = "";
+    voiceDescription.textContent = t("options.voiceDescriptionEmpty");
+  });
+
   uiLanguageInput.addEventListener("change", () => {
     currentUiLanguage = normalizeUiLanguage(uiLanguageInput.value);
     applyPageTranslations();
@@ -83,7 +110,11 @@ async function initialize() {
       return;
     }
 
-    voiceIdInput.value = selectedVoice.voiceId;
+    if (ttsProviderSelect.value === "cartesia") {
+      cartesiaVoiceIdInput.value = selectedVoice.voiceId;
+    } else {
+      voiceIdInput.value = selectedVoice.voiceId;
+    }
     voiceDescription.textContent = formatVoiceDescription(selectedVoice);
   });
 
@@ -97,6 +128,17 @@ async function initialize() {
   });
 }
 
+function updateProviderVisibility() {
+  const isCartesia = ttsProviderSelect.value === "cartesia";
+  if (isCartesia) {
+    inworldSettingsGroup.classList.add("is-hidden");
+    cartesiaSettingsGroup.classList.remove("is-hidden");
+  } else {
+    inworldSettingsGroup.classList.remove("is-hidden");
+    cartesiaSettingsGroup.classList.add("is-hidden");
+  }
+}
+
 async function loadSettingsIntoForm() {
   const { settings } = await chrome.storage.local.get("settings");
   const merged = { ...DEFAULT_SETTINGS, ...(settings ?? {}) };
@@ -104,9 +146,14 @@ async function loadSettingsIntoForm() {
   currentUiLanguage = normalizeUiLanguage(merged.uiLanguage);
 
   uiLanguageInput.value = currentUiLanguage;
-  apiKeyInput.value = merged.apiKey;
-  voiceIdInput.value = merged.voiceId;
-  modelSelect.value = merged.modelId;
+  ttsProviderSelect.value = merged.provider === "cartesia" ? "cartesia" : "inworld";
+  apiKeyInput.value = merged.inworldApiKey || merged.apiKey || "";
+  voiceIdInput.value = merged.inworldVoiceId || merged.voiceId || "";
+  modelSelect.value = merged.inworldModelId || merged.modelId || "inworld-tts-1.5-mini";
+  cartesiaApiKeyInput.value = merged.cartesiaApiKey || "";
+  cartesiaVoiceIdInput.value = merged.cartesiaVoiceId || "";
+  cartesiaModelSelect.value = merged.cartesiaModelId || "sonic-3.6";
+  cartesiaLanguageInput.value = merged.cartesiaLanguage || "";
   languageFilterInput.value = merged.languageFilter;
   sampleRateInput.value = merged.sampleRateHertz;
   temperatureInput.value = merged.temperature;
@@ -120,12 +167,23 @@ async function loadSettingsIntoForm() {
   translationApiUrlInput.value = merged.translationApiUrl || DEFAULT_TRANSLATION_API_URL;
   translationApiKeyInput.value = merged.translationApiKey;
   translationModelInput.value = merged.translationModel;
+
+  updateProviderVisibility();
   applyPageTranslations();
   updateTranslationFieldState();
 }
 
 function collectSettingsFromForm() {
+  const provider = ttsProviderSelect.value === "cartesia" ? "cartesia" : "inworld";
   return {
+    provider,
+    inworldApiKey: apiKeyInput.value.trim(),
+    inworldVoiceId: voiceIdInput.value.trim(),
+    inworldModelId: modelSelect.value,
+    cartesiaApiKey: cartesiaApiKeyInput.value.trim(),
+    cartesiaVoiceId: cartesiaVoiceIdInput.value.trim(),
+    cartesiaModelId: cartesiaModelSelect.value,
+    cartesiaLanguage: cartesiaLanguageInput.value.trim(),
     apiKey: apiKeyInput.value.trim(),
     voiceId: voiceIdInput.value.trim(),
     modelId: modelSelect.value,
@@ -165,12 +223,20 @@ async function saveSettings() {
 }
 
 function validateSettings(settings) {
-  if (!settings.apiKey) {
-    return t("options.validationApiKey");
-  }
-
-  if (!settings.voiceId) {
-    return t("options.validationVoiceId");
+  if (settings.provider === "cartesia") {
+    if (!settings.cartesiaApiKey) {
+      return t("options.validationCartesiaApiKey");
+    }
+    if (!settings.cartesiaVoiceId) {
+      return t("options.validationCartesiaVoiceId");
+    }
+  } else {
+    if (!settings.apiKey) {
+      return t("options.validationApiKey");
+    }
+    if (!settings.voiceId) {
+      return t("options.validationVoiceId");
+    }
   }
 
   if (!settings.translationEnabled) {
@@ -202,13 +268,22 @@ async function loadVoices() {
   setStatus(t("options.loadingVoices"));
 
   try {
+    const isCartesia = ttsProviderSelect.value === "cartesia";
+    const overrides = {
+      provider: ttsProviderSelect.value,
+      uiLanguage: currentUiLanguage,
+    };
+    if (isCartesia) {
+      overrides.cartesiaApiKey = cartesiaApiKeyInput.value.trim();
+    } else {
+      overrides.apiKey = apiKeyInput.value.trim();
+      overrides.inworldApiKey = apiKeyInput.value.trim();
+      overrides.languageFilter = languageFilterInput.value.trim();
+    }
+
     const response = await chrome.runtime.sendMessage({
       type: "FETCH_VOICES",
-      overrides: {
-        apiKey: apiKeyInput.value.trim(),
-        languageFilter: languageFilterInput.value.trim(),
-        uiLanguage: currentUiLanguage,
-      },
+      overrides,
     });
 
     if (!response?.ok) {
@@ -252,7 +327,9 @@ function renderVoiceOptions(voices) {
       voiceSelect.appendChild(option);
     });
 
-  const currentVoiceId = voiceIdInput.value.trim();
+  const currentVoiceId = ttsProviderSelect.value === "cartesia"
+    ? cartesiaVoiceIdInput.value.trim()
+    : voiceIdInput.value.trim();
   if (currentVoiceId) {
     voiceSelect.value = currentVoiceId;
   }

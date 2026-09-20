@@ -2,7 +2,23 @@ importScripts("i18n.js");
 
 const DEFAULT_TRANSLATION_API_URL = "https://api.openai.com/v1/chat/completions";
 
+const INWORLD_TTS_URL = "https://api.inworld.ai/tts/v1/voice";
+const INWORLD_VOICES_URL = "https://api.inworld.ai/voices/v1/voices";
+const CARTESIA_TTS_BYTES_URL = "https://api.cartesia.ai/tts/bytes";
+const CARTESIA_TTS_SSE_URL = "https://api.cartesia.ai/tts/sse";
+const CARTESIA_VOICES_URL = "https://api.cartesia.ai/voices";
+const CARTESIA_API_VERSION = "2026-08-14";
+
 const DEFAULT_SETTINGS = {
+  provider: "inworld",
+  inworldApiKey: "",
+  inworldVoiceId: "",
+  inworldModelId: "inworld-tts-1.5-mini",
+  cartesiaApiKey: "",
+  cartesiaVoiceId: "",
+  cartesiaModelId: "sonic-3.6",
+  cartesiaLanguage: "",
+  // Legacy aliases for backward compatibility
   apiKey: "",
   voiceId: "",
   modelId: "inworld-tts-1.5-mini",
@@ -24,8 +40,6 @@ const DEFAULT_SETTINGS = {
 
 const CONTEXT_MENU_ID = "readmate-selection-tts-speak";
 const MAX_TEXT_LENGTH = 2000;
-const INWORLD_TTS_URL = "https://api.inworld.ai/tts/v1/voice";
-const INWORLD_VOICES_URL = "https://api.inworld.ai/voices/v1/voices";
 
 chrome.runtime.onInstalled.addListener(async () => {
   const settings = await ensureSettings();
@@ -128,6 +142,19 @@ async function ensureSettings() {
   }
 
   const merged = { ...DEFAULT_SETTINGS, ...settings };
+  if (!merged.inworldApiKey && merged.apiKey) {
+    merged.inworldApiKey = merged.apiKey;
+  }
+  if (!merged.inworldVoiceId && merged.voiceId) {
+    merged.inworldVoiceId = merged.voiceId;
+  }
+  if (!merged.inworldModelId && merged.modelId) {
+    merged.inworldModelId = merged.modelId;
+  }
+  merged.apiKey = merged.inworldApiKey || merged.apiKey;
+  merged.voiceId = merged.inworldVoiceId || merged.voiceId;
+  merged.modelId = merged.inworldModelId || merged.modelId;
+
   if (JSON.stringify(merged) !== JSON.stringify(settings)) {
     await chrome.storage.local.set({ settings: merged });
   }
@@ -188,16 +215,28 @@ function rebuildContextMenu(language, force = false) {
 }
 
 function summarizeSettings(settings) {
-  const ttsConfigured = Boolean(settings.apiKey?.trim() && settings.voiceId?.trim());
+  const provider = settings.provider === "cartesia" ? "cartesia" : "inworld";
+  const apiKey = provider === "cartesia"
+    ? String(settings.cartesiaApiKey ?? "").trim()
+    : String(settings.inworldApiKey || settings.apiKey || "").trim();
+  const voiceId = provider === "cartesia"
+    ? String(settings.cartesiaVoiceId ?? "").trim()
+    : String(settings.inworldVoiceId || settings.voiceId || "").trim();
+  const modelId = provider === "cartesia"
+    ? String(settings.cartesiaModelId || "sonic-3.6").trim()
+    : String(settings.inworldModelId || settings.modelId || "inworld-tts-1.5-mini").trim();
+
+  const ttsConfigured = Boolean(apiKey && voiceId);
   const translationEnabled = Boolean(settings.translationEnabled);
   const translationReady = !translationEnabled || isTranslationConfigured(settings);
 
   return {
+    provider,
     configured: ttsConfigured && translationReady,
     ttsConfigured,
-    hasApiKey: Boolean(settings.apiKey?.trim()),
-    voiceId: settings.voiceId || "",
-    modelId: settings.modelId,
+    hasApiKey: Boolean(apiKey),
+    voiceId,
+    modelId,
     languageFilter: settings.languageFilter || "",
     sampleRateHertz: settings.sampleRateHertz,
     enableWordHighlight: Boolean(settings.enableWordHighlight),
@@ -254,16 +293,24 @@ function buildVoiceListUrl(languageFilter) {
 
 async function fetchVoices(overrides = {}) {
   const settings = { ...(await getSettings()), ...overrides };
-  const language = getUiLanguage(settings);
+  if (settings.provider === "cartesia") {
+    return fetchCartesiaVoices(settings);
+  }
+  return fetchInworldVoices(settings);
+}
 
-  if (!settings.apiKey?.trim()) {
+async function fetchInworldVoices(settings) {
+  const language = getUiLanguage(settings);
+  const apiKey = (settings.inworldApiKey || settings.apiKey || "").trim();
+
+  if (!apiKey) {
     throw new Error(t(language, "background.fillApiKey"));
   }
 
   const response = await fetch(buildVoiceListUrl(settings.languageFilter), {
     method: "GET",
     headers: {
-      Authorization: `Basic ${settings.apiKey.trim()}`,
+      Authorization: `Basic ${apiKey}`,
     },
   });
 
@@ -273,6 +320,37 @@ async function fetchVoices(overrides = {}) {
 
   const payload = await response.json();
   return Array.isArray(payload.voices) ? payload.voices : [];
+}
+
+async function fetchCartesiaVoices(settings) {
+  const language = getUiLanguage(settings);
+  const apiKey = (settings.cartesiaApiKey || "").trim();
+
+  if (!apiKey) {
+    throw new Error(t(language, "background.fillCartesiaApiKey"));
+  }
+
+  const response = await fetch(`${CARTESIA_VOICES_URL}?limit=100`, {
+    method: "GET",
+    headers: {
+      "X-API-Key": apiKey,
+      "Cartesia-Version": CARTESIA_API_VERSION,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response, t(language, "background.fetchVoicesFailed"), language));
+  }
+
+  const payload = await response.json();
+  const rawList = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
+  return rawList.map((v) => ({
+    voiceId: v.id,
+    displayName: v.name || v.id,
+    langCode: v.language || (Array.isArray(v.accents) && v.accents[0]?.locale) || "multilingual",
+    source: "Cartesia",
+    description: v.description || v.tagline || "",
+  }));
 }
 
 async function synthesizeSpeech(text, overrides = {}) {
@@ -292,13 +370,6 @@ async function synthesizeSpeech(text, overrides = {}) {
     throw new Error(t(language, "background.maxLengthExceeded", { max: MAX_TEXT_LENGTH }));
   }
 
-  if (!settings.apiKey?.trim()) {
-    throw new Error(t(language, "background.fillApiKeyInSettings"));
-  }
-  if (!settings.voiceId?.trim()) {
-    throw new Error(t(language, "background.fillVoiceIdInSettings"));
-  }
-
   const translation = await maybeTranslateText(originalText, settings);
   const speechText = normalizeText(translation.text);
   if (!speechText) {
@@ -311,10 +382,29 @@ async function synthesizeSpeech(text, overrides = {}) {
   const highlightEnabled =
     Boolean(settings.enableWordHighlight) && !translation.applied;
 
+  if (settings.provider === "cartesia") {
+    return synthesizeCartesiaSpeech(speechText, originalText, translation, highlightEnabled, settings);
+  }
+
+  return synthesizeInworldSpeech(speechText, originalText, translation, highlightEnabled, settings);
+}
+
+async function synthesizeInworldSpeech(speechText, originalText, translation, highlightEnabled, settings) {
+  const language = getUiLanguage(settings);
+  const apiKey = (settings.inworldApiKey || settings.apiKey || "").trim();
+  const voiceId = (settings.inworldVoiceId || settings.voiceId || "").trim();
+
+  if (!apiKey) {
+    throw new Error(t(language, "background.fillApiKeyInSettings"));
+  }
+  if (!voiceId) {
+    throw new Error(t(language, "background.fillVoiceIdInSettings"));
+  }
+
   const payload = {
     text: speechText,
-    voiceId: settings.voiceId.trim(),
-    modelId: settings.modelId || DEFAULT_SETTINGS.modelId,
+    voiceId,
+    modelId: settings.inworldModelId || settings.modelId || DEFAULT_SETTINGS.modelId,
     audioConfig: {
       audioEncoding: settings.audioEncoding || DEFAULT_SETTINGS.audioEncoding,
       sampleRateHertz: Number(settings.sampleRateHertz) || DEFAULT_SETTINGS.sampleRateHertz,
@@ -330,7 +420,7 @@ async function synthesizeSpeech(text, overrides = {}) {
 
   const response = await fetch(INWORLD_TTS_URL, {
     method: "POST",
-    headers: buildHeaders(settings.apiKey),
+    headers: buildHeaders(apiKey),
     body: JSON.stringify(payload),
   });
 
@@ -353,10 +443,257 @@ async function synthesizeSpeech(text, overrides = {}) {
     translationApplied: translation.applied,
     translationTargetLanguage: translation.targetLanguage,
     translationModel: translation.model,
-    voiceId: payload.voiceId,
+    voiceId,
     modelId: payload.modelId,
     textLength: speechText.length,
   };
+}
+
+async function synthesizeCartesiaSpeech(speechText, originalText, translation, highlightEnabled, settings) {
+  const language = getUiLanguage(settings);
+  const apiKey = (settings.cartesiaApiKey || "").trim();
+  const voiceId = (settings.cartesiaVoiceId || "").trim();
+
+  if (!apiKey) {
+    throw new Error(t(language, "background.fillCartesiaApiKeyInSettings"));
+  }
+  if (!voiceId) {
+    throw new Error(t(language, "background.fillCartesiaVoiceIdInSettings"));
+  }
+
+  if (highlightEnabled) {
+    try {
+      return await synthesizeCartesiaSse(speechText, originalText, translation, settings);
+    } catch (sseError) {
+      console.warn("Cartesia SSE failed, falling back to bytes:", sseError);
+    }
+  }
+
+  return synthesizeCartesiaBytes(speechText, originalText, translation, settings);
+}
+
+async function synthesizeCartesiaBytes(speechText, originalText, translation, settings) {
+  const language = getUiLanguage(settings);
+  const apiKey = (settings.cartesiaApiKey || "").trim();
+  const voiceId = (settings.cartesiaVoiceId || "").trim();
+  const modelId = (settings.cartesiaModelId || "sonic-3.6").trim();
+
+  const payload = {
+    model_id: modelId,
+    transcript: speechText,
+    voice: {
+      mode: "id",
+      id: voiceId,
+    },
+    output_format: {
+      container: "wav",
+      encoding: "pcm_s16le",
+      sample_rate: 44100,
+    },
+  };
+
+  if (settings.cartesiaLanguage?.trim()) {
+    payload.language = settings.cartesiaLanguage.trim();
+  }
+
+  const response = await fetch(CARTESIA_TTS_BYTES_URL, {
+    method: "POST",
+    headers: {
+      "X-API-Key": apiKey,
+      "Cartesia-Version": CARTESIA_API_VERSION,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response, t(language, "background.speechRequestFailed"), language));
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  const base64Audio = uint8ArrayToBase64(new Uint8Array(arrayBuffer));
+
+  return {
+    audioContent: base64Audio,
+    mimeType: "audio/wav",
+    usage: null,
+    timestampInfo: null,
+    sourceText: speechText,
+    originalText,
+    translationApplied: translation.applied,
+    translationTargetLanguage: translation.targetLanguage,
+    translationModel: translation.model,
+    voiceId,
+    modelId,
+    textLength: speechText.length,
+  };
+}
+
+async function synthesizeCartesiaSse(speechText, originalText, translation, settings) {
+  const language = getUiLanguage(settings);
+  const apiKey = (settings.cartesiaApiKey || "").trim();
+  const voiceId = (settings.cartesiaVoiceId || "").trim();
+  const modelId = (settings.cartesiaModelId || "sonic-3.6").trim();
+
+  const payload = {
+    model_id: modelId,
+    transcript: speechText,
+    voice: {
+      mode: "id",
+      id: voiceId,
+    },
+    output_format: {
+      container: "raw",
+      encoding: "pcm_s16le",
+      sample_rate: 44100,
+    },
+    add_timestamps: true,
+  };
+
+  if (settings.cartesiaLanguage?.trim()) {
+    payload.language = settings.cartesiaLanguage.trim();
+  }
+
+  const response = await fetch(CARTESIA_TTS_SSE_URL, {
+    method: "POST",
+    headers: {
+      "X-API-Key": apiKey,
+      "Cartesia-Version": CARTESIA_API_VERSION,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response, t(language, "background.speechRequestFailed"), language));
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  const pcmChunks = [];
+  const words = [];
+  const starts = [];
+  const ends = [];
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop();
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data:")) continue;
+      const dataStr = trimmed.slice(5).trim();
+      if (!dataStr || dataStr === "[DONE]") continue;
+
+      try {
+        const event = JSON.parse(dataStr);
+        const rawAudioBase64 = event.data || event.audio;
+        if (typeof rawAudioBase64 === "string" && rawAudioBase64) {
+          const binary = atob(rawAudioBase64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+          }
+          pcmChunks.push(bytes);
+        }
+        const wt = event.word_timestamps || event.timestamps;
+        if (wt && Array.isArray(wt.words)) {
+          for (let i = 0; i < wt.words.length; i++) {
+            words.push(wt.words[i]);
+            starts.push(Number(wt.start ? wt.start[i] : (starts[starts.length - 1] || 0)));
+            ends.push(Number(wt.end ? wt.end[i] : starts[starts.length - 1] || 0));
+          }
+        }
+      } catch (_e) {
+        // ignore malformed SSE frames
+      }
+    }
+  }
+
+  const totalPcmLength = pcmChunks.reduce((acc, chunk) => acc + chunk.length, 0);
+  if (totalPcmLength === 0) {
+    throw new Error(t(language, "background.noAudioContent"));
+  }
+
+  const combinedPcm = new Uint8Array(totalPcmLength);
+  let offset = 0;
+  for (const chunk of pcmChunks) {
+    combinedPcm.set(chunk, offset);
+    offset += chunk.length;
+  }
+
+  const wavBytes = pcmToWav(combinedPcm, 44100, 1);
+  const base64Audio = uint8ArrayToBase64(wavBytes);
+
+  const timestampInfo = words.length > 0 ? {
+    wordAlignment: {
+      words,
+      wordStartTimeSeconds: starts,
+      wordEndTimeSeconds: ends,
+    },
+  } : null;
+
+  return {
+    audioContent: base64Audio,
+    mimeType: "audio/wav",
+    usage: null,
+    timestampInfo,
+    sourceText: speechText,
+    originalText,
+    translationApplied: translation.applied,
+    translationTargetLanguage: translation.targetLanguage,
+    translationModel: translation.model,
+    voiceId,
+    modelId,
+    textLength: speechText.length,
+  };
+}
+
+function pcmToWav(pcmBytes, sampleRate = 44100, numChannels = 1) {
+  const dataSize = pcmBytes.length;
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buffer);
+
+  writeAscii(view, 0, "RIFF");
+  view.setUint32(4, 36 + dataSize, true);
+  writeAscii(view, 8, "WAVE");
+  writeAscii(view, 12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * numChannels * 2, true);
+  view.setUint16(32, numChannels * 2, true);
+  view.setUint16(34, 16, true);
+  writeAscii(view, 36, "data");
+  view.setUint32(40, dataSize, true);
+
+  const out = new Uint8Array(buffer);
+  out.set(pcmBytes, 44);
+  return out;
+}
+
+function writeAscii(view, offset, string) {
+  for (let i = 0; i < string.length; i++) {
+    view.setUint8(offset + i, string.charCodeAt(i));
+  }
+}
+
+function uint8ArrayToBase64(bytes) {
+  let binary = "";
+  const len = bytes.byteLength;
+  const chunkSize = 0x8000;
+  for (let i = 0; i < len; i += chunkSize) {
+    binary += String.fromCharCode.apply(
+      null,
+      bytes.subarray(i, Math.min(i + chunkSize, len)),
+    );
+  }
+  return btoa(binary);
 }
 
 function isTranslationConfigured(settings) {

@@ -48,13 +48,16 @@ async function refreshSummary() {
     return;
   }
 
+  const providerName = settings.provider === "cartesia" ? "Cartesia" : "Inworld";
   summary.textContent = settings.translationEnabled
     ? t("popup.summaryConfiguredWithTranslation", {
+        provider: providerName,
         modelId: settings.modelId,
         voiceId: settings.voiceId,
         targetLanguage: settings.translationTargetLanguage,
       })
     : t("popup.summaryConfigured", {
+        provider: providerName,
         modelId: settings.modelId,
         voiceId: settings.voiceId,
       });
