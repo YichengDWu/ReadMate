@@ -10,6 +10,11 @@
   let isRendering = false;
   let currentPageText = "";
 
+  // Continuous reading state
+  let isContinuousReading = false;
+  let activeContinuousAudio = null;
+  let continuousSessionId = 0;
+
   // DOM Elements
   const dropzone = document.getElementById("dropzone");
   const pagesWrapper = document.getElementById("pdf-pages-wrapper");
@@ -33,6 +38,10 @@
   const zoomPercentSpan = document.getElementById("zoomPercentSpan");
 
   const readPageBtn = document.getElementById("readPageBtn");
+  const readContinuousBtn = document.getElementById("readContinuousBtn");
+  const readContinuousLabel = document.getElementById("readContinuousLabel");
+  const continuousReadingStatus = document.getElementById("continuousReadingStatus");
+  const continuousProgressText = document.getElementById("continuousProgressText");
   const openSettingsBtn = document.getElementById("openSettingsBtn");
 
   document.addEventListener("DOMContentLoaded", initialize);
@@ -69,6 +78,7 @@
     fitWidthBtn.addEventListener("click", fitToWidth);
 
     readPageBtn.addEventListener("click", handleReadCurrentPage);
+    readContinuousBtn.addEventListener("click", toggleContinuousReading);
     openSettingsBtn.addEventListener("click", () => {
       chrome.runtime.openOptionsPage?.() || chrome.runtime.sendMessage({ type: "OPEN_OPTIONS" });
     });
@@ -154,6 +164,7 @@
       pageNumberInput.max = totalPages;
       pageNumberInput.disabled = false;
       readPageBtn.disabled = false;
+      readContinuousBtn.disabled = false;
       zoomInBtn.disabled = false;
       zoomOutBtn.disabled = false;
 
@@ -239,9 +250,12 @@
     }
   }
 
-  function goToPage(pageNum) {
+  function goToPage(pageNum, fromContinuous = false) {
     if (!currentPdfDoc || pageNum < 1 || pageNum > totalPages) return;
-    renderPage(pageNum);
+    if (!fromContinuous && isContinuousReading) {
+      stopContinuousReading();
+    }
+    return renderPage(pageNum);
   }
 
   function changeZoom(delta) {
@@ -264,34 +278,249 @@
     }
   }
 
+  function toggleContinuousReading() {
+    if (isContinuousReading) {
+      stopContinuousReading();
+    } else {
+      startContinuousReading();
+    }
+  }
+
+  function startContinuousReading() {
+    if (!currentPdfDoc || totalPages < 1) return;
+
+    isContinuousReading = true;
+    continuousSessionId++;
+    const sessionId = continuousSessionId;
+
+    readContinuousBtn.classList.add("is-reading");
+    readContinuousLabel.textContent = t("pdf.stopContinuousRead", "停止朗读");
+    continuousReadingStatus.classList.remove("is-hidden");
+
+    runContinuousReadingLoop(currentPageNumber, sessionId);
+  }
+
+  function stopContinuousReading() {
+    isContinuousReading = false;
+    continuousSessionId++;
+
+    if (activeContinuousAudio) {
+      try {
+        activeContinuousAudio.pause();
+        activeContinuousAudio.removeAttribute("src");
+        activeContinuousAudio.load();
+      } catch (_e) {}
+      activeContinuousAudio = null;
+    }
+
+    readContinuousBtn.classList.remove("is-reading");
+    readContinuousLabel.textContent = t("pdf.continuousRead", "连续朗读");
+    continuousReadingStatus.classList.add("is-hidden");
+    hideStatus();
+  }
+
+  function updateContinuousProgress(pageNum) {
+    continuousProgressText.textContent = t(
+      "pdf.readingPageProgress",
+      `正在朗读第 ${pageNum} / ${totalPages} 页`,
+      { current: pageNum, total: totalPages }
+    );
+  }
+
+  async function runContinuousReadingLoop(startPage, sessionId) {
+    let pageNum = startPage;
+    let consecutiveEmptyPages = 0;
+
+    while (isContinuousReading && sessionId === continuousSessionId && pageNum <= totalPages) {
+      updateContinuousProgress(pageNum);
+
+      // Render page if not already showing
+      if (currentPageNumber !== pageNum) {
+        await renderPage(pageNum);
+        document.getElementById("viewer-container").scrollTo({ top: 0, behavior: "smooth" });
+      }
+
+      const text = currentPageText ? currentPageText.trim() : "";
+      if (!text) {
+        consecutiveEmptyPages++;
+        if (consecutiveEmptyPages >= 3) {
+          showStatus(t("pdf.noTextOnPage", "连续多页无文本，已停止朗读。"));
+          setTimeout(hideStatus, 2000);
+          break;
+        }
+
+        showStatus(t("pdf.skippingBlankPage", `第 ${pageNum} 页无文本，自动跳过...`, { page: pageNum }));
+        await new Promise((r) => setTimeout(r, 800));
+        hideStatus();
+        pageNum++;
+        continue;
+      }
+
+      consecutiveEmptyPages = 0;
+      const chunks = splitTextIntoChunks(text, 1500);
+
+      let pageOk = true;
+      for (let i = 0; i < chunks.length; i++) {
+        if (!isContinuousReading || sessionId !== continuousSessionId) {
+          pageOk = false;
+          break;
+        }
+
+        try {
+          showStatus(t("content.loadingSpeechLabel", "正在合成语音..."));
+          const finished = await playTextChunk(chunks[i], sessionId);
+          hideStatus();
+          if (!finished) {
+            pageOk = false;
+            break;
+          }
+        } catch (err) {
+          hideStatus();
+          console.error("Continuous reading error on page " + pageNum + ":", err);
+          alert(err.message);
+          pageOk = false;
+          break;
+        }
+      }
+
+      if (!pageOk || !isContinuousReading || sessionId !== continuousSessionId) {
+        break;
+      }
+
+      // Turn to next page automatically!
+      if (pageNum < totalPages) {
+        pageNum++;
+        // Small pause between pages for pleasant reading cadence
+        await new Promise((r) => setTimeout(r, 400));
+      } else {
+        // Last page completed
+        showStatus(t("pdf.readingCompleted", "全书已朗读完成。"));
+        setTimeout(hideStatus, 3000);
+        break;
+      }
+    }
+
+    if (sessionId === continuousSessionId) {
+      stopContinuousReading();
+    }
+  }
+
+  function splitTextIntoChunks(text, maxChars = 1500) {
+    const trimmed = text.trim();
+    if (trimmed.length <= maxChars) {
+      return [trimmed];
+    }
+
+    const chunks = [];
+    const sentences = trimmed.split(/(?<=[.!?;\n。！？；\r])\s*/);
+    let currentChunk = "";
+
+    for (const sentence of sentences) {
+      if (!sentence) continue;
+      if ((currentChunk + " " + sentence).length <= maxChars) {
+        currentChunk = currentChunk ? currentChunk + " " + sentence : sentence;
+      } else {
+        if (currentChunk) {
+          chunks.push(currentChunk);
+        }
+        if (sentence.length > maxChars) {
+          for (let i = 0; i < sentence.length; i += maxChars) {
+            chunks.push(sentence.slice(i, i + maxChars));
+          }
+          currentChunk = "";
+        } else {
+          currentChunk = sentence;
+        }
+      }
+    }
+
+    if (currentChunk) {
+      chunks.push(currentChunk);
+    }
+
+    return chunks.length ? chunks : [trimmed.slice(0, maxChars)];
+  }
+
+  function playTextChunk(chunkText, sessionId) {
+    return new Promise(async (resolve, reject) => {
+      if (!isContinuousReading || sessionId !== continuousSessionId) {
+        resolve(false);
+        return;
+      }
+
+      try {
+        const response = await chrome.runtime.sendMessage({
+          type: "SPEAK_TEXT",
+          text: chunkText,
+        });
+
+        if (!isContinuousReading || sessionId !== continuousSessionId) {
+          resolve(false);
+          return;
+        }
+
+        if (!response?.ok) {
+          throw new Error(response?.error || "Speech synthesis failed");
+        }
+
+        const audioContent = response.result?.audioContent;
+        const mimeType = response.result?.mimeType || "audio/wav";
+        if (!audioContent) {
+          throw new Error("No audio content received");
+        }
+
+        const audio = new Audio(`data:${mimeType};base64,${audioContent}`);
+        activeContinuousAudio = audio;
+
+        audio.addEventListener("ended", () => {
+          activeContinuousAudio = null;
+          resolve(true);
+        });
+
+        audio.addEventListener("error", () => {
+          activeContinuousAudio = null;
+          reject(new Error("Audio playback failed"));
+        });
+
+        await audio.play();
+      } catch (e) {
+        activeContinuousAudio = null;
+        reject(e);
+      }
+    });
+  }
+
   async function handleReadCurrentPage() {
+    stopContinuousReading();
+
     if (!currentPageText) {
       alert(t("pdf.noTextOnPage", "当前页面没有检测到可朗读的文本。"));
       return;
     }
 
+    const chunks = splitTextIntoChunks(currentPageText, 1500);
+    continuousSessionId++;
+    const sessionId = continuousSessionId;
+    isContinuousReading = true;
+
+    readPageBtn.disabled = true;
+    readContinuousBtn.disabled = true;
+
     try {
-      showStatus(t("content.loadingSpeechLabel", "正在合成语音..."));
-      const response = await chrome.runtime.sendMessage({
-        type: "SPEAK_TEXT",
-        text: currentPageText.slice(0, 2000),
-      });
-
-      hideStatus();
-      if (!response?.ok) {
-        throw new Error(response?.error || "Speech synthesis failed");
-      }
-
-      // If content.js playAudioPayload is available in window
-      if (typeof window.playAudioPayload === "function") {
-        await window.playAudioPayload(response.result);
-      } else {
-        const audio = new Audio("data:audio/wav;base64," + response.result.audioContent);
-        audio.play();
+      for (const chunk of chunks) {
+        if (sessionId !== continuousSessionId) break;
+        showStatus(t("content.loadingSpeechLabel", "正在合成语音..."));
+        const finished = await playTextChunk(chunk, sessionId);
+        hideStatus();
+        if (!finished) break;
       }
     } catch (err) {
       hideStatus();
       alert(err.message);
+    } finally {
+      readPageBtn.disabled = false;
+      readContinuousBtn.disabled = false;
+      isContinuousReading = false;
     }
   }
 
@@ -304,12 +533,17 @@
     viewerStatus.classList.add("viewer-status-hidden");
   }
 
-  function t(key, fallback = "") {
-    if (window.InworldI18n && typeof window.InworldI18n.t === "function") {
-      const val = window.InworldI18n.t(key);
+  function t(key, fallback = "", params = {}) {
+    if (window.InworldI18n && typeof window.InworldI18n.getMessage === "function") {
+      const lang = window.InworldI18n.getInitialUiLanguage();
+      const val = window.InworldI18n.getMessage(key, params, lang);
       if (val && val !== key) return val;
     }
-    return fallback || key;
+    let res = fallback || key;
+    for (const [k, v] of Object.entries(params)) {
+      res = res.replace(new RegExp(`\\{${k}\\}`, "g"), String(v));
+    }
+    return res;
   }
 
   function applyTranslations() {
