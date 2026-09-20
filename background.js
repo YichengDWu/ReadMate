@@ -39,7 +39,56 @@ const DEFAULT_SETTINGS = {
 };
 
 const CONTEXT_MENU_ID = "readmate-selection-tts-speak";
+const CONTEXT_MENU_PDF_ID = "readmate-open-pdf-viewer";
+const OFFSCREEN_DOCUMENT_PATH = "offscreen.html";
 const MAX_TEXT_LENGTH = 2000;
+
+async function ensureOffscreenDocument() {
+  if (chrome.offscreen?.hasDocument) {
+    const hasDoc = await chrome.offscreen.hasDocument();
+    if (hasDoc) {
+      return;
+    }
+  } else if (chrome.runtime?.getContexts) {
+    const contexts = await chrome.runtime.getContexts({
+      contextTypes: ["OFFSCREEN_DOCUMENT"],
+      documentUrls: [chrome.runtime.getURL(OFFSCREEN_DOCUMENT_PATH)],
+    });
+    if (contexts.length > 0) {
+      return;
+    }
+  }
+
+  await chrome.offscreen.createDocument({
+    url: OFFSCREEN_DOCUMENT_PATH,
+    reasons: [chrome.offscreen.Reason.AUDIO_PLAYBACK],
+    justification: "Play speech synthesis audio when content script cannot be injected, such as in Chrome's native PDF viewer.",
+  });
+}
+
+async function playViaOffscreen(payload) {
+  await ensureOffscreenDocument();
+  return chrome.runtime.sendMessage({
+    type: "PLAY_OFFSCREEN_AUDIO",
+    target: "offscreen",
+    payload,
+  });
+}
+
+async function stopViaOffscreen() {
+  try {
+    if (chrome.offscreen?.hasDocument) {
+      const hasDoc = await chrome.offscreen.hasDocument();
+      if (!hasDoc) return;
+    }
+    await chrome.runtime.sendMessage({
+      type: "STOP_OFFSCREEN_AUDIO",
+      target: "offscreen",
+    });
+  } catch (_e) {
+    // ignore
+  }
+}
 
 chrome.runtime.onInstalled.addListener(async () => {
   const settings = await ensureSettings();
@@ -69,6 +118,12 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 });
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId === CONTEXT_MENU_PDF_ID && info.linkUrl) {
+    const viewerUrl = chrome.runtime.getURL("pdf-viewer.html") + "?file=" + encodeURIComponent(info.linkUrl);
+    chrome.tabs.create({ url: viewerUrl });
+    return;
+  }
+
   if (info.menuItemId !== CONTEXT_MENU_ID || !info.selectionText || !tab?.id) {
     return;
   }
@@ -78,18 +133,30 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
   try {
     const result = await synthesizeSpeech(info.selectionText, settings);
-    await chrome.tabs.sendMessage(tab.id, {
-      type: "PLAY_AUDIO_FROM_TTS",
-      payload: result,
-    });
+    try {
+      await chrome.tabs.sendMessage(tab.id, {
+        type: "PLAY_AUDIO_FROM_TTS",
+        payload: result,
+      });
+    } catch (tabError) {
+      // Content script unavailable (native PDF viewer or restricted page) -> offscreen audio!
+      console.log("Tab audio routing failed, falling back to offscreen playback:", tabError);
+      await playViaOffscreen(result);
+    }
   } catch (error) {
-    await chrome.tabs.sendMessage(tab.id, {
-      type: "INWORLD_TTS_ERROR",
-      error:
-        error instanceof Error
-          ? error.message
-          : t(language, "background.readFailedCheckConfig"),
-    }).catch(() => undefined);
+    const message =
+      error instanceof Error
+        ? error.message
+        : t(language, "background.readFailedCheckConfig");
+
+    try {
+      await chrome.tabs.sendMessage(tab.id, {
+        type: "INWORLD_TTS_ERROR",
+        error: message,
+      });
+    } catch (_e) {
+      console.error("ReadMate speech error:", message);
+    }
   }
 });
 
@@ -125,6 +192,16 @@ async function handleMessage(message) {
     }
     case "OPEN_OPTIONS": {
       await chrome.runtime.openOptionsPage();
+      return {};
+    }
+    case "OPEN_PDF_VIEWER": {
+      const viewerUrl = chrome.runtime.getURL("pdf-viewer.html") +
+        (message?.fileUrl ? "?file=" + encodeURIComponent(message.fileUrl) : "");
+      const tab = await chrome.tabs.create({ url: viewerUrl });
+      return { tabId: tab.id };
+    }
+    case "STOP_PLAYBACK": {
+      await stopViaOffscreen();
       return {};
     }
     default: {
@@ -202,6 +279,18 @@ function rebuildContextMenu(language, force = false) {
           id: CONTEXT_MENU_ID,
           title: t(language, "background.contextMenuSpeakSelection"),
           contexts: ["selection"],
+        },
+        () => {
+          void chrome.runtime.lastError;
+        },
+      );
+
+      chrome.contextMenus.create(
+        {
+          id: CONTEXT_MENU_PDF_ID,
+          title: t(language, "background.contextMenuOpenInPdfViewer"),
+          contexts: ["link"],
+          targetUrlPatterns: ["*://*/*.pdf*", "*://*/*.PDF*"],
         },
         () => {
           void chrome.runtime.lastError;

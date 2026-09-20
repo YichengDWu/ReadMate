@@ -12,6 +12,7 @@
       "common.uiLanguageEnglish": "English",
 
       "background.contextMenuSpeakSelection": "朗读所选文本",
+      "background.contextMenuOpenInPdfViewer": "在 ReadMate 中打开此 PDF",
       "background.readFailedCheckConfig": "朗读失败，请检查配置。",
       "background.unknownError": "未知错误",
       "background.unsupportedMessageType": "不支持的消息类型。",
@@ -186,6 +187,22 @@
       "content.extensionReloadedReadyMessage": "扩展已重载，刷新当前网页后才能继续使用。",
       "content.extensionReloadedToast": "扩展刚刚重载，请刷新当前页面后再试。",
 
+      "popup.pdfReaderButton": "打开 PDF 阅读器",
+
+      "pdf.openFile": "打开文件",
+      "pdf.openLocalFile": "打开本地 PDF 文件",
+      "pdf.fitWidth": "自适应",
+      "pdf.readCurrentPage": "朗读当前页",
+      "pdf.readPage": "朗读整页",
+      "pdf.dropzoneTitle": "拖拽 PDF 文件到此处打开",
+      "pdf.dropzoneDesc": "或者点击下方按钮选择本地文件，或输入网络 PDF 链接",
+      "pdf.selectFile": "选择本地 PDF",
+      "pdf.urlPlaceholder": "https://example.com/document.pdf",
+      "pdf.openUrl": "打开",
+      "pdf.loadingFile": "正在加载 PDF 文件...",
+      "pdf.openFailed": "打开 PDF 失败：",
+      "pdf.noTextOnPage": "当前页面没有检测到可朗读的文本。",
+
       "manifest.popupTitle": "ReadMate 划词朗读",
     },
 
@@ -198,6 +215,7 @@
       "common.uiLanguageEnglish": "English",
 
       "background.contextMenuSpeakSelection": "Read selected text",
+      "background.contextMenuOpenInPdfViewer": "Open PDF with ReadMate",
       "background.readFailedCheckConfig": "Speech failed. Please check your settings.",
       "background.unknownError": "Unknown error",
       "background.unsupportedMessageType": "Unsupported message type.",
@@ -371,6 +389,22 @@
       "content.pageRefreshAction": "Refresh page",
       "content.extensionReloadedReadyMessage": "The extension has reloaded. Refresh this page before using it again.",
       "content.extensionReloadedToast": "The extension was just reloaded. Refresh this page and try again.",
+
+      "popup.pdfReaderButton": "Open PDF Reader",
+
+      "pdf.openFile": "Open File",
+      "pdf.openLocalFile": "Open local PDF file",
+      "pdf.fitWidth": "Fit Width",
+      "pdf.readCurrentPage": "Read Current Page",
+      "pdf.readPage": "Read Page",
+      "pdf.dropzoneTitle": "Drag & drop a PDF file here to open",
+      "pdf.dropzoneDesc": "Or click the button below to select a local file, or enter an online PDF link",
+      "pdf.selectFile": "Select local PDF",
+      "pdf.urlPlaceholder": "https://example.com/document.pdf",
+      "pdf.openUrl": "Open",
+      "pdf.loadingFile": "Loading PDF file...",
+      "pdf.openFailed": "Failed to open PDF: ",
+      "pdf.noTextOnPage": "No readable text was detected on this page.",
 
       "manifest.popupTitle": "ReadMate Selection TTS",
     },

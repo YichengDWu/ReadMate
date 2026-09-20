@@ -1,6 +1,7 @@
 const summary = document.getElementById("summary");
 const message = document.getElementById("message");
 const speakButton = document.getElementById("speakButton");
+const pdfReaderButton = document.getElementById("pdfReaderButton");
 const stopButton = document.getElementById("stopButton");
 const settingsButton = document.getElementById("settingsButton");
 
@@ -14,6 +15,11 @@ async function initialize() {
 
   speakButton.addEventListener("click", async () => {
     await sendMessageToActiveTab("TRIGGER_PLAY_SELECTION");
+  });
+
+  pdfReaderButton.addEventListener("click", async () => {
+    await chrome.runtime.sendMessage({ type: "OPEN_PDF_VIEWER" });
+    window.close();
   });
 
   stopButton.addEventListener("click", async () => {
