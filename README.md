@@ -1,8 +1,8 @@
-# Inworld Selection TTS
+# ReadMate
 
 English | [简体中文](./README.zh-CN.md)
 
-A Chrome / Edge Manifest V3 extension that reads selected text aloud with Inworld TTS. Select text on any webpage, click the floating action, and the extension will synthesize and play speech directly in the page.
+ReadMate is a Chrome / Edge Manifest V3 browser extension that turns selected text into speech with AI TTS and word-level highlighting. Select text on any webpage, click the floating speaker button, and ReadMate will read it aloud directly in the page.
 
 Disclaimer: this project was vibe coded with Codex.
 
@@ -49,7 +49,7 @@ Privacy & permissions: see [PRIVACY.md](./PRIVACY.md).
 5. Select the project directory you just cloned or downloaded:
 
 ```text
-/path/to/inworld-selection-tts-extension
+/path/to/ReadMate
 ```
 
 ## Initial Setup

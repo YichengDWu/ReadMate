@@ -22,7 +22,7 @@ const DEFAULT_SETTINGS = {
   uiLanguage: InworldI18n.getInitialUiLanguage(),
 };
 
-const CONTEXT_MENU_ID = "inworld-selection-tts-speak";
+const CONTEXT_MENU_ID = "readmate-selection-tts-speak";
 const MAX_TEXT_LENGTH = 2000;
 const INWORLD_TTS_URL = "https://api.inworld.ai/tts/v1/voice";
 const INWORLD_VOICES_URL = "https://api.inworld.ai/voices/v1/voices";

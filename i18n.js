@@ -4,10 +4,10 @@
 
   const UI_MESSAGES = {
     "zh-CN": {
-      "common.brand": "Inworld Selection TTS",
-      "common.brandShort": "Inworld TTS",
-      "common.miniPlayerTitle": "Inworld Mini Player",
-      "common.actionTitle": "Inworld 划词朗读",
+      "common.brand": "ReadMate",
+      "common.brandShort": "ReadMate",
+      "common.miniPlayerTitle": "ReadMate 伴读播放器",
+      "common.actionTitle": "ReadMate 划词朗读",
       "common.uiLanguageChinese": "简体中文",
       "common.uiLanguageEnglish": "English",
 
@@ -35,7 +35,7 @@
       "background.errorWithStatus": "{message}（HTTP {status}）",
       "background.errorWithDetail": "{message}：{detail}",
 
-      "popup.pageTitle": "Inworld 划词朗读",
+      "popup.pageTitle": "ReadMate 划词朗读",
       "popup.heading": "划词朗读",
       "popup.loadingSummary": "正在读取配置…",
       "popup.speakButton": "朗读当前选中文本",
@@ -54,7 +54,7 @@
       "popup.refreshPageAfterReload": "当前页面里的旧脚本已失效，刷新该网页后再试。",
       "popup.unsupportedPage": "当前页面可能不支持注入扩展脚本，请切换到普通网页再试。",
 
-      "options.pageTitle": "Inworld Selection TTS 设置",
+      "options.pageTitle": "ReadMate 设置",
       "options.heroTitle": "划词朗读扩展设置",
       "options.heroLede": "选择文本后即可朗读。这里配置 Inworld API Key、Voice ID、模型和测试参数。",
       "options.connectionHeading": "连接设置",
@@ -111,7 +111,7 @@
       "options.testHeading": "测试朗读",
       "options.testDescription": "不需要切回网页，直接在这里验证 API Key、Voice ID 和模型配置。",
       "options.testTextLabel": "测试文本",
-      "options.testTextDefault": "你好，这是一段 Inworld 划词朗读扩展的测试音频。",
+      "options.testTextDefault": "你好，这是一段 ReadMate 划词朗读扩展的测试音频。",
       "options.testButton": "测试朗读",
       "options.stopButton": "停止播放",
       "options.testTextRequired": "请输入测试文本。",
@@ -170,14 +170,14 @@
       "content.extensionReloadedReadyMessage": "扩展已重载，刷新当前网页后才能继续使用。",
       "content.extensionReloadedToast": "扩展刚刚重载，请刷新当前页面后再试。",
 
-      "manifest.popupTitle": "Inworld 划词朗读",
+      "manifest.popupTitle": "ReadMate 划词朗读",
     },
 
     en: {
-      "common.brand": "Inworld Selection TTS",
-      "common.brandShort": "Inworld TTS",
-      "common.miniPlayerTitle": "Inworld Mini Player",
-      "common.actionTitle": "Inworld Selection TTS",
+      "common.brand": "ReadMate",
+      "common.brandShort": "ReadMate",
+      "common.miniPlayerTitle": "ReadMate Mini Player",
+      "common.actionTitle": "ReadMate Selection TTS",
       "common.uiLanguageChinese": "Simplified Chinese",
       "common.uiLanguageEnglish": "English",
 
@@ -205,7 +205,7 @@
       "background.errorWithStatus": "{message} (HTTP {status})",
       "background.errorWithDetail": "{message}: {detail}",
 
-      "popup.pageTitle": "Inworld Selection TTS",
+      "popup.pageTitle": "ReadMate Selection TTS",
       "popup.heading": "Selection TTS",
       "popup.loadingSummary": "Loading settings...",
       "popup.speakButton": "Speak current selection",
@@ -224,7 +224,7 @@
       "popup.refreshPageAfterReload": "The content script on this page is outdated. Refresh the page and try again.",
       "popup.unsupportedPage": "This page may not support injected extension scripts. Try again on a regular webpage.",
 
-      "options.pageTitle": "Inworld Selection TTS Settings",
+      "options.pageTitle": "ReadMate Settings",
       "options.heroTitle": "Selection TTS Settings",
       "options.heroLede": "Configure the Inworld API key, Voice ID, model, and test parameters used when reading selected text aloud.",
       "options.connectionHeading": "Connection Settings",
@@ -281,7 +281,7 @@
       "options.testHeading": "Test Playback",
       "options.testDescription": "Validate your API key, Voice ID, and model settings here without leaving the settings page.",
       "options.testTextLabel": "Test text",
-      "options.testTextDefault": "Hello, this is a test clip from the Inworld Selection TTS extension.",
+      "options.testTextDefault": "Hello, this is a test clip from ReadMate.",
       "options.testButton": "Test speech",
       "options.stopButton": "Stop playback",
       "options.testTextRequired": "Please enter some test text.",
@@ -340,7 +340,7 @@
       "content.extensionReloadedReadyMessage": "The extension has reloaded. Refresh this page before using it again.",
       "content.extensionReloadedToast": "The extension was just reloaded. Refresh this page and try again.",
 
-      "manifest.popupTitle": "Inworld Selection TTS",
+      "manifest.popupTitle": "ReadMate Selection TTS",
     },
   };
 

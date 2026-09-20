@@ -1,8 +1,8 @@
-# Inworld Selection TTS
+# ReadMate
 
 [English](./README.md) | 简体中文
 
-一个从零实现的 Chrome / Edge Manifest V3 扩展：在网页里划词后，点击悬浮按钮即可调用 Inworld TTS 朗读。
+**ReadMate（伴读小友）** 是一个 Chrome / Edge Manifest V3 浏览器扩展：在网页里划选文本后，点击悬浮喇叭按钮即可调用 AI TTS 朗读并支持词级高亮跟读。
 
 免责声明：本项目是使用 Codex vibe code 出来的。
 
@@ -49,7 +49,7 @@
 5. 选择你刚刚克隆或下载下来的项目目录：
 
 ```text
-/path/to/inworld-selection-tts-extension
+/path/to/ReadMate
 ```
 
 ## 首次配置

@@ -1,10 +1,10 @@
-# Privacy & Permissions
+# ReadMate - Privacy & Permissions
 
-English | [简体中文](#隐私与权限说明)
+English | [简体中文](#readmate-隐私与权限说明)
 
 ## Privacy & Permissions
 
-This extension is designed for personal use and does not include analytics, telemetry, or any backend controlled by this repository.
+ReadMate is designed for personal use and does not include analytics, telemetry, or any backend controlled by this repository.
 
 ### What data is used
 
@@ -37,9 +37,9 @@ If you plan to publish this extension broadly, consider moving API calls behind 
 
 ---
 
-## 隐私与权限说明
+## ReadMate 隐私与权限说明
 
-这个扩展主要面向个人使用，不包含分析、埋点，也没有由本仓库维护的后端服务。
+ReadMate 扩展主要面向个人使用，不包含分析、埋点，也没有由本仓库维护的后端服务。
 
 ### 会使用哪些数据
 
