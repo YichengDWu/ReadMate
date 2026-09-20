@@ -9,6 +9,9 @@ const DEFAULT_SETTINGS = {
   cartesiaVoiceId: "",
   cartesiaModelId: "sonic-3.6",
   cartesiaLanguage: "",
+  fishApiKey: "",
+  fishVoiceId: "",
+  fishModelId: "s2.1-pro-free",
   // Legacy aliases for backward compatibility
   apiKey: "",
   voiceId: "",
@@ -34,6 +37,7 @@ const uiLanguageInput = document.getElementById("uiLanguage");
 const ttsProviderSelect = document.getElementById("ttsProvider");
 const inworldSettingsGroup = document.getElementById("inworldSettingsGroup");
 const cartesiaSettingsGroup = document.getElementById("cartesiaSettingsGroup");
+const fishaudioSettingsGroup = document.getElementById("fishaudioSettingsGroup");
 
 const apiKeyInput = document.getElementById("apiKey");
 const voiceIdInput = document.getElementById("voiceId");
@@ -48,6 +52,10 @@ const cartesiaApiKeyInput = document.getElementById("cartesiaApiKey");
 const cartesiaVoiceIdInput = document.getElementById("cartesiaVoiceId");
 const cartesiaModelSelect = document.getElementById("cartesiaModelId");
 const cartesiaLanguageInput = document.getElementById("cartesiaLanguage");
+
+const fishApiKeyInput = document.getElementById("fishApiKey");
+const fishModelSelect = document.getElementById("fishModelId");
+const fishVoiceIdInput = document.getElementById("fishVoiceId");
 
 const enableWordHighlightInput = document.getElementById("enableWordHighlight");
 const autoPlayOnSelectionInput = document.getElementById("autoPlayOnSelection");
@@ -112,6 +120,8 @@ async function initialize() {
 
     if (ttsProviderSelect.value === "cartesia") {
       cartesiaVoiceIdInput.value = selectedVoice.voiceId;
+    } else if (ttsProviderSelect.value === "fishaudio") {
+      fishVoiceIdInput.value = selectedVoice.voiceId;
     } else {
       voiceIdInput.value = selectedVoice.voiceId;
     }
@@ -129,14 +139,10 @@ async function initialize() {
 }
 
 function updateProviderVisibility() {
-  const isCartesia = ttsProviderSelect.value === "cartesia";
-  if (isCartesia) {
-    inworldSettingsGroup.classList.add("is-hidden");
-    cartesiaSettingsGroup.classList.remove("is-hidden");
-  } else {
-    inworldSettingsGroup.classList.remove("is-hidden");
-    cartesiaSettingsGroup.classList.add("is-hidden");
-  }
+  const provider = ttsProviderSelect.value;
+  inworldSettingsGroup.classList.toggle("is-hidden", provider !== "inworld");
+  cartesiaSettingsGroup.classList.toggle("is-hidden", provider !== "cartesia");
+  fishaudioSettingsGroup.classList.toggle("is-hidden", provider !== "fishaudio");
 }
 
 async function loadSettingsIntoForm() {
@@ -146,7 +152,7 @@ async function loadSettingsIntoForm() {
   currentUiLanguage = normalizeUiLanguage(merged.uiLanguage);
 
   uiLanguageInput.value = currentUiLanguage;
-  ttsProviderSelect.value = merged.provider === "cartesia" ? "cartesia" : "inworld";
+  ttsProviderSelect.value = ["cartesia", "fishaudio"].includes(merged.provider) ? merged.provider : "inworld";
   apiKeyInput.value = merged.inworldApiKey || merged.apiKey || "";
   voiceIdInput.value = merged.inworldVoiceId || merged.voiceId || "";
   modelSelect.value = merged.inworldModelId || merged.modelId || "inworld-tts-1.5-mini";
@@ -154,6 +160,9 @@ async function loadSettingsIntoForm() {
   cartesiaVoiceIdInput.value = merged.cartesiaVoiceId || "";
   cartesiaModelSelect.value = merged.cartesiaModelId || "sonic-3.6";
   cartesiaLanguageInput.value = merged.cartesiaLanguage || "";
+  fishApiKeyInput.value = merged.fishApiKey || "";
+  fishModelSelect.value = merged.fishModelId || "s2.1-pro-free";
+  fishVoiceIdInput.value = merged.fishVoiceId || "";
   languageFilterInput.value = merged.languageFilter;
   sampleRateInput.value = merged.sampleRateHertz;
   temperatureInput.value = merged.temperature;
@@ -174,7 +183,7 @@ async function loadSettingsIntoForm() {
 }
 
 function collectSettingsFromForm() {
-  const provider = ttsProviderSelect.value === "cartesia" ? "cartesia" : "inworld";
+  const provider = ["cartesia", "fishaudio"].includes(ttsProviderSelect.value) ? ttsProviderSelect.value : "inworld";
   return {
     provider,
     inworldApiKey: apiKeyInput.value.trim(),
@@ -184,6 +193,9 @@ function collectSettingsFromForm() {
     cartesiaVoiceId: cartesiaVoiceIdInput.value.trim(),
     cartesiaModelId: cartesiaModelSelect.value,
     cartesiaLanguage: cartesiaLanguageInput.value.trim(),
+    fishApiKey: fishApiKeyInput.value.trim(),
+    fishModelId: fishModelSelect.value,
+    fishVoiceId: fishVoiceIdInput.value.trim(),
     apiKey: apiKeyInput.value.trim(),
     voiceId: voiceIdInput.value.trim(),
     modelId: modelSelect.value,
@@ -230,6 +242,10 @@ function validateSettings(settings) {
     if (!settings.cartesiaVoiceId) {
       return t("options.validationCartesiaVoiceId");
     }
+  } else if (settings.provider === "fishaudio") {
+    if (!settings.fishApiKey) {
+      return t("options.validationFishApiKey");
+    }
   } else {
     if (!settings.apiKey) {
       return t("options.validationApiKey");
@@ -268,13 +284,15 @@ async function loadVoices() {
   setStatus(t("options.loadingVoices"));
 
   try {
-    const isCartesia = ttsProviderSelect.value === "cartesia";
+    const currentProvider = ttsProviderSelect.value;
     const overrides = {
-      provider: ttsProviderSelect.value,
+      provider: currentProvider,
       uiLanguage: currentUiLanguage,
     };
-    if (isCartesia) {
+    if (currentProvider === "cartesia") {
       overrides.cartesiaApiKey = cartesiaApiKeyInput.value.trim();
+    } else if (currentProvider === "fishaudio") {
+      overrides.fishApiKey = fishApiKeyInput.value.trim();
     } else {
       overrides.apiKey = apiKeyInput.value.trim();
       overrides.inworldApiKey = apiKeyInput.value.trim();

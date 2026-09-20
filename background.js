@@ -8,6 +8,8 @@ const CARTESIA_TTS_BYTES_URL = "https://api.cartesia.ai/tts/bytes";
 const CARTESIA_TTS_SSE_URL = "https://api.cartesia.ai/tts/sse";
 const CARTESIA_VOICES_URL = "https://api.cartesia.ai/voices";
 const CARTESIA_API_VERSION = "2026-08-14";
+const FISH_AUDIO_TTS_URL = "https://api.fish.audio/v1/tts";
+const FISH_AUDIO_MODELS_URL = "https://api.fish.audio/model";
 
 const DEFAULT_SETTINGS = {
   provider: "inworld",
@@ -18,6 +20,9 @@ const DEFAULT_SETTINGS = {
   cartesiaVoiceId: "",
   cartesiaModelId: "sonic-3.6",
   cartesiaLanguage: "",
+  fishApiKey: "",
+  fishVoiceId: "",
+  fishModelId: "s2.1-pro-free",
   // Legacy aliases for backward compatibility
   apiKey: "",
   voiceId: "",
@@ -304,18 +309,26 @@ function rebuildContextMenu(language, force = false) {
 }
 
 function summarizeSettings(settings) {
-  const provider = settings.provider === "cartesia" ? "cartesia" : "inworld";
-  const apiKey = provider === "cartesia"
-    ? String(settings.cartesiaApiKey ?? "").trim()
-    : String(settings.inworldApiKey || settings.apiKey || "").trim();
-  const voiceId = provider === "cartesia"
-    ? String(settings.cartesiaVoiceId ?? "").trim()
-    : String(settings.inworldVoiceId || settings.voiceId || "").trim();
-  const modelId = provider === "cartesia"
-    ? String(settings.cartesiaModelId || "sonic-3.6").trim()
-    : String(settings.inworldModelId || settings.modelId || "inworld-tts-1.5-mini").trim();
+  const provider = settings.provider === "cartesia" ? "cartesia" : (settings.provider === "fishaudio" ? "fishaudio" : "inworld");
+  let apiKey = "";
+  let voiceId = "";
+  let modelId = "";
 
-  const ttsConfigured = Boolean(apiKey && voiceId);
+  if (provider === "cartesia") {
+    apiKey = String(settings.cartesiaApiKey ?? "").trim();
+    voiceId = String(settings.cartesiaVoiceId ?? "").trim();
+    modelId = String(settings.cartesiaModelId || "sonic-3.6").trim();
+  } else if (provider === "fishaudio") {
+    apiKey = String(settings.fishApiKey ?? "").trim();
+    voiceId = String(settings.fishVoiceId ?? "").trim();
+    modelId = String(settings.fishModelId || "s2.1-pro-free").trim();
+  } else {
+    apiKey = String(settings.inworldApiKey || settings.apiKey || "").trim();
+    voiceId = String(settings.inworldVoiceId || settings.voiceId || "").trim();
+    modelId = String(settings.inworldModelId || settings.modelId || "inworld-tts-1.5-mini").trim();
+  }
+
+  const ttsConfigured = provider === "fishaudio" ? Boolean(apiKey) : Boolean(apiKey && voiceId);
   const translationEnabled = Boolean(settings.translationEnabled);
   const translationReady = !translationEnabled || isTranslationConfigured(settings);
 
@@ -385,7 +398,40 @@ async function fetchVoices(overrides = {}) {
   if (settings.provider === "cartesia") {
     return fetchCartesiaVoices(settings);
   }
+  if (settings.provider === "fishaudio") {
+    return fetchFishAudioVoices(settings);
+  }
   return fetchInworldVoices(settings);
+}
+
+async function fetchFishAudioVoices(settings) {
+  const language = getUiLanguage(settings);
+  const apiKey = (settings.fishApiKey || "").trim();
+
+  if (!apiKey) {
+    throw new Error(t(language, "background.fillFishApiKey"));
+  }
+
+  const response = await fetch(`${FISH_AUDIO_MODELS_URL}?page_size=30`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response, t(language, "background.fetchVoicesFailed"), language));
+  }
+
+  const payload = await response.json();
+  const rawList = Array.isArray(payload?.items) ? payload.items : (Array.isArray(payload) ? payload : []);
+  return rawList.map((v) => ({
+    voiceId: v._id || v.id,
+    displayName: v.title || v.name || v._id,
+    langCode: Array.isArray(v.languages) ? v.languages.join(", ") : (v.language || "multilingual"),
+    source: "Fish Audio",
+    description: v.description || (Array.isArray(v.tags) ? v.tags.join(", ") : ""),
+  }));
 }
 
 async function fetchInworldVoices(settings) {
@@ -475,7 +521,65 @@ async function synthesizeSpeech(text, overrides = {}) {
     return synthesizeCartesiaSpeech(speechText, originalText, translation, highlightEnabled, settings);
   }
 
+  if (settings.provider === "fishaudio") {
+    return synthesizeFishAudioSpeech(speechText, originalText, translation, settings);
+  }
+
   return synthesizeInworldSpeech(speechText, originalText, translation, highlightEnabled, settings);
+}
+
+async function synthesizeFishAudioSpeech(speechText, originalText, translation, settings) {
+  const language = getUiLanguage(settings);
+  const apiKey = (settings.fishApiKey || "").trim();
+  const modelId = (settings.fishModelId || "s2.1-pro-free").trim();
+  const voiceId = (settings.fishVoiceId || "").trim();
+
+  if (!apiKey) {
+    throw new Error(t(language, "background.fillFishApiKeyInSettings"));
+  }
+
+  const payload = {
+    text: speechText,
+    format: "mp3",
+  };
+
+  if (voiceId) {
+    payload.reference_id = voiceId;
+  }
+
+  const headers = {
+    Authorization: `Bearer ${apiKey}`,
+    "Content-Type": "application/json",
+    model: modelId,
+  };
+
+  const response = await fetch(FISH_AUDIO_TTS_URL, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response, t(language, "background.speechRequestFailed"), language));
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  const base64Audio = uint8ArrayToBase64(new Uint8Array(arrayBuffer));
+
+  return {
+    audioContent: base64Audio,
+    mimeType: "audio/mpeg",
+    usage: null,
+    timestampInfo: null,
+    sourceText: speechText,
+    originalText,
+    translationApplied: translation.applied,
+    translationTargetLanguage: translation.targetLanguage,
+    translationModel: translation.model,
+    voiceId: voiceId || "default",
+    modelId,
+    textLength: speechText.length,
+  };
 }
 
 async function synthesizeInworldSpeech(speechText, originalText, translation, highlightEnabled, settings) {

@@ -38,6 +38,7 @@
             <select id="ttsProvider" name="provider">
               <option value="inworld" data-i18n="options.providerInworld">Inworld AI</option>
               <option value="cartesia" data-i18n="options.providerCartesia">Cartesia AI (Sonic 3.6)</option>
+              <option value="fishaudio" data-i18n="options.providerFishAudio">Fish Audio (S2.1 Pro / Free)</option>
             </select>
           </label>
 
@@ -172,6 +173,41 @@
                 autocomplete="off"
                 data-i18n-placeholder="options.cartesiaLanguagePlaceholder"
                 placeholder="For example: en, zh, ja, or leave empty"
+              />
+            </label>
+          </div>
+
+          <div id="fishaudioSettingsGroup" class="provider-group is-hidden">
+            <label class="field field-full">
+              <span data-i18n="options.fishApiKeyLabel">Fish Audio API Key</span>
+              <input
+                id="fishApiKey"
+                name="fishApiKey"
+                type="password"
+                autocomplete="off"
+                data-i18n-placeholder="options.fishApiKeyPlaceholder"
+                placeholder="Enter your Fish Audio API key (from fish.audio/app/api-keys)"
+              />
+            </label>
+
+            <label class="field">
+              <span data-i18n="options.fishModelLabel">Fish Audio Model</span>
+              <select id="fishModelId" name="fishModelId">
+                <option value="s2.1-pro-free">s2.1-pro-free (Free Tier · Recommended)</option>
+                <option value="s2.1-pro">s2.1-pro (Flagship S2.1 Pro)</option>
+                <option value="s2-pro">s2-pro (S2 Pro)</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span data-i18n="options.fishVoiceIdLabel">Voice ID / Reference ID (Optional)</span>
+              <input
+                id="fishVoiceId"
+                name="fishVoiceId"
+                type="text"
+                autocomplete="off"
+                data-i18n-placeholder="options.fishVoiceIdPlaceholder"
+                placeholder="Leave blank for default voice, or paste Voice ID"
               />
             </label>
           </div>

@@ -12,6 +12,7 @@
   "host_permissions": [
     "https://api.inworld.ai/*",
     "https://api.cartesia.ai/*",
+    "https://api.fish.audio/*",
     "<all_urls>"
   ],
   "icons": {

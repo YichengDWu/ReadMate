@@ -54,7 +54,12 @@ async function refreshSummary() {
     return;
   }
 
-  const providerName = settings.provider === "cartesia" ? "Cartesia" : "Inworld";
+  const providerName =
+    settings.provider === "cartesia"
+      ? "Cartesia"
+      : settings.provider === "fishaudio"
+        ? "Fish Audio"
+        : "Inworld";
   summary.textContent = settings.translationEnabled
     ? t("popup.summaryConfiguredWithTranslation", {
         provider: providerName,
