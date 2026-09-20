@@ -192,10 +192,9 @@ window.addEventListener("pointercancel", (event) => {
   finishPointerInteraction(event);
 }, true);
 
-actionButton.addEventListener("click", () => {
-  if (isBusy) {
-    return;
-  }
+actionButton.addEventListener("click", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
 
   if (!hasExtensionContext()) {
     handleExtensionContextLoss();
@@ -207,7 +206,11 @@ actionButton.addEventListener("click", () => {
     return;
   }
 
-  void speakCurrentSelection();
+  speakCurrentSelection().catch((error) => {
+    if (!isExtensionContextInvalidatedError(error)) {
+      console.warn("ReadMate speak error:", error);
+    }
+  });
 });
 
 document.addEventListener("mouseup", handleSelectionGesture, true);
@@ -441,7 +444,7 @@ async function speakCurrentSelection() {
 
   if (!hasExtensionContext()) {
     handleExtensionContextLoss();
-    throw new Error(t("content.extensionReloadedToast"));
+    return;
   }
 
   const latestSelection = readSelection();
@@ -453,12 +456,12 @@ async function speakCurrentSelection() {
 
   if (!currentSelectionText) {
     showToast(t("content.noSelection"));
-    throw new Error(t("content.noSelection"));
+    return;
   }
 
   if (currentSelectionText.length > MAX_SELECTION_LENGTH) {
     showToast(t("content.overLimitDetail", { count: currentSelectionText.length }));
-    throw new Error(t("content.selectionTooLong"));
+    return;
   }
 
   isBusy = true;
@@ -487,6 +490,10 @@ async function speakCurrentSelection() {
 
     await playAudioPayload(response.result);
   } catch (error) {
+    if (isExtensionContextInvalidatedError(error)) {
+      handleExtensionContextLoss();
+      return;
+    }
     const message =
       error instanceof Error ? error.message : t("background.readFailedCheckConfig");
     hideMiniPlayer();
@@ -496,7 +503,7 @@ async function speakCurrentSelection() {
       disabled: false,
     });
     showToast(message);
-    throw new Error(message);
+    throw error;
   } finally {
     isBusy = false;
     updateMiniPlayer();
@@ -1457,6 +1464,8 @@ function handleExtensionContextLoss() {
   stopPlayback({ refreshSelection: false });
   hideBubble();
   hideMiniPlayer();
+  document.removeEventListener("mouseup", handleSelectionGesture, true);
+  document.removeEventListener("keyup", handleSelectionGesture, true);
   actionButton.disabled = true;
   actionButton.title = t("content.pageRefreshAction");
   actionButton.setAttribute("aria-label", t("content.pageRefreshAction"));
@@ -1466,6 +1475,11 @@ function handleExtensionContextLoss() {
 }
 
 function handleSelectionGesture(event) {
+  if (!hasExtensionContext()) {
+    handleExtensionContextLoss();
+    return;
+  }
+
   if (
     event?.target &&
     (bubble.contains(event.target) || miniPlayer.contains(event.target))
