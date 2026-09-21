@@ -52,6 +52,47 @@ const TRANSLATION_PRESETS = {
   },
 };
 
+function normalizeTranslationApiUrl(rawValue) {
+  let value = String(rawValue ?? DEFAULT_TRANSLATION_API_URL).trim();
+  if (!value) {
+    value = DEFAULT_TRANSLATION_API_URL;
+  }
+
+  if (!/^https?:\/\//i.test(value)) {
+    if (/^(localhost|127\.0\.0\.1)(:\d+)?/i.test(value)) {
+      value = `http://${value}`;
+    } else {
+      value = `https://${value}`;
+    }
+  }
+
+  const parsedUrl = new URL(value);
+  let pathname = parsedUrl.pathname.replace(/\/+$/, "");
+
+  if (pathname.endsWith("/chat/completions")) {
+    parsedUrl.pathname = pathname;
+    return parsedUrl.toString();
+  }
+
+  if (/\/v\d+([a-zA-Z0-9_-]+)?$/i.test(pathname)) {
+    parsedUrl.pathname = `${pathname}/chat/completions`;
+    return parsedUrl.toString();
+  }
+
+  if (parsedUrl.hostname === "api.deepseek.com") {
+    parsedUrl.pathname = `${pathname}/chat/completions`.replace(/\/\/+/g, "/");
+    return parsedUrl.toString();
+  }
+
+  if (!pathname || pathname === "/") {
+    parsedUrl.pathname = "/v1/chat/completions";
+    return parsedUrl.toString();
+  }
+
+  parsedUrl.pathname = `${pathname}/chat/completions`;
+  return parsedUrl.toString();
+}
+
 function mapTargetLanguageToPreset(rawLang) {
   const lang = String(rawLang ?? "").trim().toLowerCase();
   if (!lang) return "Simplified Chinese";
@@ -193,11 +234,37 @@ async function initialize() {
     applyPageTranslations();
   });
 
-  translationPresetSelect.addEventListener("change", () => {
+  translationPresetSelect.addEventListener("change", async () => {
     const preset = TRANSLATION_PRESETS[translationPresetSelect.value];
     if (preset) {
       translationApiUrlInput.value = preset.apiUrl;
       translationModelInput.value = preset.model;
+
+      if (translationPresetSelect.value === "ollama") {
+        try {
+          const resp = await fetch("http://localhost:11434/api/tags");
+          if (resp.ok) {
+            const data = await resp.json();
+            const models = (data.models || []).map((m) => m.name || m.model).filter(Boolean);
+            if (models.length > 0 && !models.includes("qwen2.5:7b")) {
+              translationModelInput.value = models[0];
+            }
+          }
+        } catch (_e) {
+          // ignore if Ollama is not running locally
+        }
+      }
+    }
+  });
+
+  translationApiUrlInput.addEventListener("blur", () => {
+    const raw = translationApiUrlInput.value.trim();
+    if (raw) {
+      try {
+        translationApiUrlInput.value = normalizeTranslationApiUrl(raw);
+      } catch (_e) {
+        // ignore
+      }
     }
   });
 
@@ -346,7 +413,13 @@ function collectSettingsFromForm() {
     translationProviderPreset: translationPresetSelect.value,
     translationEnabled: translationEnabledInput.checked,
     translationTargetLanguage: targetLang,
-    translationApiUrl: translationApiUrlInput.value.trim() || DEFAULT_TRANSLATION_API_URL,
+    translationApiUrl: (() => {
+      try {
+        return normalizeTranslationApiUrl(translationApiUrlInput.value.trim() || DEFAULT_TRANSLATION_API_URL);
+      } catch (_e) {
+        return translationApiUrlInput.value.trim() || DEFAULT_TRANSLATION_API_URL;
+      }
+    })(),
     translationApiKey: translationApiKeyInput.value.trim(),
     translationModel: translationModelInput.value.trim(),
     uiLanguage: normalizeUiLanguage(uiLanguageInput.value),

@@ -916,9 +916,20 @@ function isTranslationConfigured(settings) {
 }
 
 function normalizeTranslationApiUrl(rawValue, language) {
-  const value = String(rawValue ?? DEFAULT_TRANSLATION_API_URL).trim() || DEFAULT_TRANSLATION_API_URL;
-  let parsedUrl;
+  let value = String(rawValue ?? DEFAULT_TRANSLATION_API_URL).trim();
+  if (!value) {
+    value = DEFAULT_TRANSLATION_API_URL;
+  }
 
+  if (!/^https?:\/\//i.test(value)) {
+    if (/^(localhost|127\.0\.0\.1)(:\d+)?/i.test(value)) {
+      value = `http://${value}`;
+    } else {
+      value = `https://${value}`;
+    }
+  }
+
+  let parsedUrl;
   try {
     parsedUrl = new URL(value);
   } catch (_error) {
@@ -929,6 +940,29 @@ function normalizeTranslationApiUrl(rawValue, language) {
     throw new Error(t(language, "background.invalidTranslationApiUrlProtocol"));
   }
 
+  let pathname = parsedUrl.pathname.replace(/\/+$/, "");
+
+  if (pathname.endsWith("/chat/completions")) {
+    parsedUrl.pathname = pathname;
+    return parsedUrl.toString();
+  }
+
+  if (/\/v\d+([a-zA-Z0-9_-]+)?$/i.test(pathname)) {
+    parsedUrl.pathname = `${pathname}/chat/completions`;
+    return parsedUrl.toString();
+  }
+
+  if (parsedUrl.hostname === "api.deepseek.com") {
+    parsedUrl.pathname = `${pathname}/chat/completions`.replace(/\/\/+/g, "/");
+    return parsedUrl.toString();
+  }
+
+  if (!pathname || pathname === "/") {
+    parsedUrl.pathname = "/v1/chat/completions";
+    return parsedUrl.toString();
+  }
+
+  parsedUrl.pathname = `${pathname}/chat/completions`;
   return parsedUrl.toString();
 }
 
@@ -1178,34 +1212,43 @@ function inferMimeType(audioEncoding) {
 
 async function readApiError(response, fallbackMessage, language) {
   const text = await response.text();
-  if (!text) {
-    return t(language, "background.errorWithStatus", {
+  let detail = "";
+
+  if (text) {
+    try {
+      const payload = JSON.parse(text);
+      detail =
+        (typeof payload?.error === "string" ? payload.error : payload?.error?.message) ||
+        payload?.message ||
+        payload?.details ||
+        payload?.status ||
+        "";
+    } catch (_error) {
+      // ignore JSON parsing errors and fall back to raw text below
+    }
+
+    if (!detail) {
+      detail = text.trim();
+    }
+  }
+
+  if (response.status === 404 || detail === "Not Found" || detail === "404 page not found") {
+    const tip = language === "zh-CN"
+      ? "（404 Not Found：请检查 LLM API URL 路径是否正确，需以 /chat/completions 结尾；若使用本地/自建模型，请确认该模型名称已正确下载安装）"
+      : " (404 Not Found: Please verify that the LLM API URL ends with /chat/completions, and that the specified model exists on your server)";
+    return `${fallbackMessage}: ${detail || "404 Not Found"} ${tip}`;
+  }
+
+  if (detail) {
+    return t(language, "background.errorWithDetail", {
       message: fallbackMessage,
-      status: response.status,
+      detail,
     });
   }
 
-  try {
-    const payload = JSON.parse(text);
-    const detail =
-      payload?.error?.message ||
-      payload?.message ||
-      payload?.details ||
-      payload?.status;
-
-    if (detail) {
-      return t(language, "background.errorWithDetail", {
-        message: fallbackMessage,
-        detail,
-      });
-    }
-  } catch (_error) {
-    // ignore JSON parsing errors and fall back to raw text below
-  }
-
-  return t(language, "background.errorWithDetail", {
+  return t(language, "background.errorWithStatus", {
     message: fallbackMessage,
-    detail: text,
+    status: response.status,
   });
 }
 
