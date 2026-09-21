@@ -1740,16 +1740,23 @@ function positionTranslationCard(rect) {
     rect = currentSelectionRect;
   }
   const cardWidth = 360;
-  const gap = 10;
-  let left = rect ? rect.left : 20;
-  left = Math.min(
+  const cardHeight = 280;
+  const gap = 6;
+
+  // Align with the exact location where the speaker/translate bubble appears
+  let anchorX = rect ? rect.right - 14 : 20;
+  let anchorY = rect ? rect.bottom + gap : 20;
+
+  let left = Math.min(
     window.innerWidth - cardWidth - 16,
-    Math.max(16, left),
+    Math.max(16, anchorX),
   );
 
-  let top = (rect ? rect.bottom : 20) + gap;
-  if (top + 260 > window.innerHeight && rect && rect.top - 260 > 0) {
-    top = Math.max(10, rect.top - 260);
+  let top = anchorY;
+  if (top + cardHeight > window.innerHeight && rect && rect.top - cardHeight - gap > 0) {
+    top = Math.max(12, rect.top - cardHeight - gap);
+  } else {
+    top = Math.min(window.innerHeight - cardHeight - 16, Math.max(12, top));
   }
 
   translationCard.style.left = `${left}px`;
@@ -1792,19 +1799,52 @@ async function triggerSelectionTranslation() {
       throw new Error(response?.error || t("content.translationFailed"));
     }
 
+    let freshRect = targetRect;
+    if (currentSelectionSnapshot?.range) {
+      try {
+        const clientRects = Array.from(currentSelectionSnapshot.range.getClientRects()).filter(
+          (r) => r.width > 0 && r.height > 0,
+        );
+        const lastRect = clientRects.length > 0 ? clientRects[clientRects.length - 1] : null;
+        freshRect = lastRect || currentSelectionSnapshot.range.getBoundingClientRect() || targetRect;
+      } catch (_e) {
+        freshRect = targetRect;
+      }
+    } else if (currentSelectionSnapshot?.inputElement) {
+      try {
+        freshRect = currentSelectionSnapshot.inputElement.getBoundingClientRect() || targetRect;
+      } catch (_e) {
+        freshRect = targetRect;
+      }
+    }
+
     showTranslationCard({
       originalText: textToTranslate,
       translatedText: response.result.text,
       targetLanguage: response.result.targetLanguage,
       model: response.result.model,
-      rect: targetRect,
+      rect: freshRect,
     });
   } catch (error) {
     if (isExtensionContextInvalidatedError(error)) {
       handleExtensionContextLoss();
       return;
     }
-    showTranslationErrorCard(error?.message || t("content.translationFailed"), targetRect);
+
+    let freshRect = targetRect;
+    if (currentSelectionSnapshot?.range) {
+      try {
+        const clientRects = Array.from(currentSelectionSnapshot.range.getClientRects()).filter(
+          (r) => r.width > 0 && r.height > 0,
+        );
+        const lastRect = clientRects.length > 0 ? clientRects[clientRects.length - 1] : null;
+        freshRect = lastRect || currentSelectionSnapshot.range.getBoundingClientRect() || targetRect;
+      } catch (_e) {
+        freshRect = targetRect;
+      }
+    }
+
+    showTranslationErrorCard(error?.message || t("content.translationFailed"), freshRect);
   } finally {
     isTranslating = false;
     translateButton.disabled = false;
