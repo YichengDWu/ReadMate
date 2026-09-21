@@ -294,6 +294,7 @@ button:disabled {
   gap: 16px;
 }
 
+.is-hidden,
 .provider-group.is-hidden {
   display: none !important;
 }

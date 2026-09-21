@@ -1569,11 +1569,46 @@ function hideBubble() {
   bubble.classList.remove("inworld-visible");
 }
 
+function formatTargetLanguageLabel(targetLanguage) {
+  if (!targetLanguage) return "";
+  const isZh = normalizeUiLanguage(contentSettings.uiLanguage) === "zh-CN";
+  const zhMap = {
+    "Simplified Chinese": "简体中文",
+    "Traditional Chinese": "繁體中文",
+    "English": "英语",
+    "Japanese": "日本語",
+    "Korean": "한국어",
+    "French": "法语",
+    "Spanish": "西班牙语",
+    "German": "德语",
+    "Russian": "俄语",
+    "Italian": "意大利语",
+    "Portuguese": "葡萄牙语",
+    "Arabic": "阿拉伯语",
+  };
+  const enMap = {
+    "Simplified Chinese": "Chinese",
+    "Traditional Chinese": "Traditional Chinese",
+    "English": "English",
+    "Japanese": "Japanese",
+    "Korean": "Korean",
+    "French": "French",
+    "Spanish": "Spanish",
+    "German": "German",
+    "Russian": "Russian",
+    "Italian": "Italian",
+    "Portuguese": "Portuguese",
+    "Arabic": "Arabic",
+  };
+  const map = isZh ? zhMap : enMap;
+  return map[targetLanguage] || targetLanguage;
+}
+
 function showTranslationCard({ originalText, translatedText, targetLanguage, model, rect }) {
   currentTranslationData = { originalText, translatedText, targetLanguage, model };
 
   translationCardBadge.textContent = t("content.translationCardTitle");
-  translationCardLang.textContent = targetLanguage || "";
+  translationCardLang.textContent = formatTargetLanguageLabel(targetLanguage);
   translationCardBody.textContent = translatedText;
   translationCardBody.className = "readmate-trans-body";
   translationModelBadge.textContent = model ? `Model: ${model}` : "";

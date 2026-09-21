@@ -52,6 +52,67 @@ const TRANSLATION_PRESETS = {
   },
 };
 
+function mapTargetLanguageToPreset(rawLang) {
+  const lang = String(rawLang ?? "").trim().toLowerCase();
+  if (!lang) return "Simplified Chinese";
+  if (
+    lang === "simplified chinese" ||
+    lang === "简体中文" ||
+    lang === "中文" ||
+    lang === "zh" ||
+    lang === "zh-cn" ||
+    lang === "chinese"
+  ) {
+    return "Simplified Chinese";
+  }
+  if (
+    lang === "english" ||
+    lang === "英语" ||
+    lang === "en" ||
+    lang === "en-us" ||
+    lang === "en-gb"
+  ) {
+    return "English";
+  }
+  if (
+    lang === "traditional chinese" ||
+    lang === "繁体中文" ||
+    lang === "繁體中文" ||
+    lang === "zh-tw" ||
+    lang === "zh-hk"
+  ) {
+    return "Traditional Chinese";
+  }
+  if (lang === "japanese" || lang === "日语" || lang === "日本語" || lang === "ja") {
+    return "Japanese";
+  }
+  if (lang === "korean" || lang === "韩语" || lang === "한국어" || lang === "ko") {
+    return "Korean";
+  }
+  if (lang === "french" || lang === "法语" || lang === "français" || lang === "fr") {
+    return "French";
+  }
+  if (lang === "spanish" || lang === "西班牙语" || lang === "español" || lang === "es") {
+    return "Spanish";
+  }
+  if (lang === "german" || lang === "德语" || lang === "deutsch" || lang === "de") {
+    return "German";
+  }
+  if (lang === "russian" || lang === "俄语" || lang === "русский" || lang === "ru") {
+    return "Russian";
+  }
+  if (lang === "italian" || lang === "意大利语" || lang === "italiano" || lang === "it") {
+    return "Italian";
+  }
+  if (lang === "portuguese" || lang === "葡萄牙语" || lang === "português" || lang === "pt") {
+    return "Portuguese";
+  }
+  if (lang === "arabic" || lang === "阿拉伯语" || lang === "ar") {
+    return "Arabic";
+  }
+  return null;
+}
+
 const form = document.getElementById("settings-form");
 const uiLanguageInput = document.getElementById("uiLanguage");
 const ttsProviderSelect = document.getElementById("ttsProvider");
@@ -82,7 +143,8 @@ const autoPlayOnSelectionInput = document.getElementById("autoPlayOnSelection");
 const keepPlayerVisibleAfterPlaybackInput = document.getElementById("keepPlayerVisibleAfterPlayback");
 const translationPresetSelect = document.getElementById("translationPreset");
 const translationEnabledInput = document.getElementById("translationEnabled");
-const translationTargetLanguageInput = document.getElementById("translationTargetLanguage");
+const translationTargetLanguageSelect = document.getElementById("translationTargetLanguageSelect");
+const customTargetLanguageInput = document.getElementById("customTargetLanguage");
 const translationApiUrlInput = document.getElementById("translationApiUrl");
 const translationApiKeyInput = document.getElementById("translationApiKey");
 const translationModelInput = document.getElementById("translationModel");
@@ -154,6 +216,15 @@ async function initialize() {
     await testTranslation();
   });
 
+  translationTargetLanguageSelect.addEventListener("change", () => {
+    if (translationTargetLanguageSelect.value === "custom") {
+      customTargetLanguageInput.classList.remove("is-hidden");
+      customTargetLanguageInput.focus();
+    } else {
+      customTargetLanguageInput.classList.add("is-hidden");
+    }
+  });
+
   translationEnabledInput.addEventListener("change", () => {
     updateTranslationFieldState();
   });
@@ -219,8 +290,20 @@ async function loadSettingsIntoForm() {
   keepPlayerVisibleAfterPlaybackInput.checked = Boolean(merged.keepPlayerVisibleAfterPlayback);
   translationPresetSelect.value = merged.translationProviderPreset || "custom";
   translationEnabledInput.checked = Boolean(merged.translationEnabled);
-  translationTargetLanguageInput.value =
-    merged.translationTargetLanguage || (currentUiLanguage === "zh-CN" ? "简体中文" : "English");
+
+  const storedTargetLang =
+    merged.translationTargetLanguage || (currentUiLanguage === "zh-CN" ? "Simplified Chinese" : "English");
+  const matchedPreset = mapTargetLanguageToPreset(storedTargetLang);
+  if (matchedPreset) {
+    translationTargetLanguageSelect.value = matchedPreset;
+    customTargetLanguageInput.value = "";
+    customTargetLanguageInput.classList.add("is-hidden");
+  } else {
+    translationTargetLanguageSelect.value = "custom";
+    customTargetLanguageInput.value = storedTargetLang;
+    customTargetLanguageInput.classList.remove("is-hidden");
+  }
+
   translationApiUrlInput.value = merged.translationApiUrl || DEFAULT_TRANSLATION_API_URL;
   translationApiKeyInput.value = merged.translationApiKey || "";
   translationModelInput.value = merged.translationModel || "";
@@ -232,6 +315,11 @@ async function loadSettingsIntoForm() {
 
 function collectSettingsFromForm() {
   const provider = ["cartesia", "fishaudio"].includes(ttsProviderSelect.value) ? ttsProviderSelect.value : "inworld";
+  let targetLang = translationTargetLanguageSelect.value;
+  if (targetLang === "custom") {
+    targetLang = customTargetLanguageInput.value.trim();
+  }
+
   return {
     provider,
     inworldApiKey: apiKeyInput.value.trim(),
@@ -257,7 +345,7 @@ function collectSettingsFromForm() {
     keepPlayerVisibleAfterPlayback: keepPlayerVisibleAfterPlaybackInput.checked,
     translationProviderPreset: translationPresetSelect.value,
     translationEnabled: translationEnabledInput.checked,
-    translationTargetLanguage: translationTargetLanguageInput.value.trim(),
+    translationTargetLanguage: targetLang,
     translationApiUrl: translationApiUrlInput.value.trim() || DEFAULT_TRANSLATION_API_URL,
     translationApiKey: translationApiKeyInput.value.trim(),
     translationModel: translationModelInput.value.trim(),

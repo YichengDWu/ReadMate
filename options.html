@@ -262,14 +262,30 @@
           </label>
 
           <label class="field">
-            <span data-i18n="options.translationTargetLanguageLabel">Target language</span>
+            <span data-i18n="options.translationTargetLanguageLabel">目标语言</span>
+            <select id="translationTargetLanguageSelect" name="translationTargetLanguageSelect">
+              <option value="Simplified Chinese" data-i18n="options.langSimplifiedChinese">简体中文 (Simplified Chinese)</option>
+              <option value="English" data-i18n="options.langEnglish">English (英语)</option>
+              <option value="Traditional Chinese" data-i18n="options.langTraditionalChinese">繁體中文 (Traditional Chinese)</option>
+              <option value="Japanese" data-i18n="options.langJapanese">日本語 (日语)</option>
+              <option value="Korean" data-i18n="options.langKorean">한국어 (韩语)</option>
+              <option value="French" data-i18n="options.langFrench">Français (法语)</option>
+              <option value="Spanish" data-i18n="options.langSpanish">Español (西班牙语)</option>
+              <option value="German" data-i18n="options.langGerman">Deutsch (德语)</option>
+              <option value="Russian" data-i18n="options.langRussian">Русский (俄语)</option>
+              <option value="Italian" data-i18n="options.langItalian">Italiano (意大利语)</option>
+              <option value="Portuguese" data-i18n="options.langPortuguese">Português (葡萄牙语)</option>
+              <option value="Arabic" data-i18n="options.langArabic">العربية (阿拉伯语)</option>
+              <option value="custom" data-i18n="options.langCustom">自定义 (Custom...)</option>
+            </select>
             <input
-              id="translationTargetLanguage"
-              name="translationTargetLanguage"
+              id="customTargetLanguage"
+              name="customTargetLanguage"
+              class="is-hidden"
               type="text"
               autocomplete="off"
-              data-i18n-placeholder="options.translationTargetLanguagePlaceholder"
-              placeholder="例如 简体中文、English、Japanese"
+              data-i18n-placeholder="options.customTargetLanguagePlaceholder"
+              placeholder="输入自定义语言，如 Cantonese, 粤语, Latin"
             />
           </label>
 
