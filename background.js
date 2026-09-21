@@ -384,6 +384,7 @@ function buildHeaders(apiKey) {
 function buildTranslationHeaders(apiKey) {
   const headers = {
     "Content-Type": "application/json",
+    Accept: "application/json",
   };
 
   if (String(apiKey ?? "").trim()) {
@@ -1011,6 +1012,7 @@ async function translateTextWithLlm(text, options) {
     body: JSON.stringify({
       model: options.model,
       temperature: 0.2,
+      stream: false,
       messages: [
         {
           role: "system",
@@ -1036,7 +1038,19 @@ async function translateTextWithLlm(text, options) {
     );
   }
 
-  const payload = await response.json();
+  const rawText = await response.text();
+  let payload = null;
+
+  try {
+    payload = JSON.parse(rawText);
+  } catch (error) {
+    // If the server returned SSE streams (data: {...}) or Newline-Delimited JSON (NDJSON)
+    payload = parseStreamOrNdjson(rawText);
+    if (!payload) {
+      throw error;
+    }
+  }
+
   const translatedText = extractTranslationText(payload);
   if (!translatedText) {
     throw new Error(t(options.language, "background.translationNoResult"));
@@ -1045,9 +1059,74 @@ async function translateTextWithLlm(text, options) {
   return translatedText;
 }
 
+function parseStreamOrNdjson(rawText) {
+  const lines = rawText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  let accumulated = "";
+  let foundAny = false;
+
+  for (const line of lines) {
+    let jsonStr = line;
+    if (line.startsWith("data:")) {
+      jsonStr = line.slice(5).trim();
+    }
+    if (jsonStr === "[DONE]") {
+      continue;
+    }
+    try {
+      const obj = JSON.parse(jsonStr);
+      foundAny = true;
+      const delta = obj?.choices?.[0]?.delta?.content;
+      if (typeof delta === "string") {
+        accumulated += delta;
+        continue;
+      }
+      const msg = obj?.choices?.[0]?.message?.content;
+      if (typeof msg === "string") {
+        accumulated += msg;
+        continue;
+      }
+      const ollamaMsg = obj?.message?.content;
+      if (typeof ollamaMsg === "string") {
+        accumulated += ollamaMsg;
+        continue;
+      }
+      const textChunk = obj?.choices?.[0]?.text;
+      if (typeof textChunk === "string") {
+        accumulated += textChunk;
+        continue;
+      }
+      const responseChunk = obj?.response;
+      if (typeof responseChunk === "string") {
+        accumulated += responseChunk;
+        continue;
+      }
+    } catch (_e) {
+      // ignore non-json lines
+    }
+  }
+
+  if (foundAny && accumulated.trim()) {
+    return {
+      choices: [
+        {
+          message: {
+            content: accumulated.trim(),
+          },
+        },
+      ],
+    };
+  }
+
+  return null;
+}
+
 function extractTranslationText(payload) {
-  const content = payload?.choices?.[0]?.message?.content;
-  const fallbackText = payload?.choices?.[0]?.text;
+  const content =
+    payload?.choices?.[0]?.message?.content ??
+    payload?.message?.content ??
+    payload?.response ??
+    payload?.output?.text ??
+    payload?.choices?.[0]?.text;
 
   if (typeof content === "string") {
     return content.trim();
@@ -1072,10 +1151,6 @@ function extractTranslationText(payload) {
       })
       .join("\n")
       .trim();
-  }
-
-  if (typeof fallbackText === "string") {
-    return fallbackText.trim();
   }
 
   return "";
