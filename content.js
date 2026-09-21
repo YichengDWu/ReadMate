@@ -330,8 +330,9 @@ actionButton.addEventListener("click", (event) => {
   event.preventDefault();
   event.stopPropagation();
 
-  if (!hasExtensionContext()) {
+  if (extensionContextLost || !hasExtensionContext()) {
     handleExtensionContextLoss();
+    window.location.reload();
     return;
   }
 
@@ -351,8 +352,9 @@ translateButton.addEventListener("click", async (event) => {
   event.preventDefault();
   event.stopPropagation();
 
-  if (!hasExtensionContext()) {
+  if (extensionContextLost || !hasExtensionContext()) {
     handleExtensionContextLoss();
+    window.location.reload();
     return;
   }
 
@@ -1601,7 +1603,9 @@ function updateButtonState({ label, detail, disabled, icon }) {
     actionButton.style.cursor = "pointer";
   } else if (icon === "refresh" || extensionContextLost) {
     actionButton.innerHTML = REFRESH_ICON_SVG;
-    actionButton.style.cursor = "not-allowed";
+    actionButton.style.cursor = "pointer";
+    actionButton.disabled = false;
+    actionButton.title = t("content.pageRefreshAction");
   } else {
     actionButton.innerHTML = SPEAKER_ICON_SVG;
     actionButton.style.cursor = disabled ? "not-allowed" : "pointer";
@@ -2005,11 +2009,13 @@ function handleExtensionContextLoss() {
   hideMiniPlayer();
   document.removeEventListener("mouseup", handleSelectionGesture, true);
   document.removeEventListener("keyup", handleSelectionGesture, true);
-  actionButton.disabled = true;
+  actionButton.disabled = false;
+  actionButton.style.cursor = "pointer";
   actionButton.title = t("content.pageRefreshAction");
   actionButton.setAttribute("aria-label", t("content.pageRefreshAction"));
   actionButton.innerHTML = REFRESH_ICON_SVG;
-  translateButton.disabled = true;
+  translateButton.disabled = false;
+  translateButton.style.cursor = "pointer";
   translateButton.title = t("content.pageRefreshAction");
   translateButton.setAttribute("aria-label", t("content.pageRefreshAction"));
   metaBody.textContent = t("content.extensionReloadedReadyMessage");
@@ -2095,7 +2101,8 @@ function refreshLocalizedUi() {
   metaTitle.textContent = t("common.brandShort");
 
   if (extensionContextLost) {
-    actionButton.disabled = true;
+    actionButton.disabled = false;
+    actionButton.style.cursor = "pointer";
     actionButton.title = t("content.pageRefreshAction");
     actionButton.setAttribute("aria-label", t("content.pageRefreshAction"));
     actionButton.innerHTML = REFRESH_ICON_SVG;

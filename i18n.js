@@ -233,9 +233,9 @@
       "content.playerTranslatedLabel": "译文",
       "content.playerOriginalLabel": "原文",
       "content.playerTargetLanguageLabel": "目标语言",
-      "content.pageRefreshAction": "请刷新页面",
+      "content.pageRefreshAction": "扩展已重载，点击刷新页面",
       "content.extensionReloadedReadyMessage": "扩展已重载，刷新当前网页后才能继续使用。",
-      "content.extensionReloadedToast": "扩展刚刚重载，请刷新当前页面后再试。",
+      "content.extensionReloadedToast": "扩展刚刚重载，请刷新网页后再试（或点击图标直接刷新）。",
 
       "popup.pdfReaderButton": "打开 PDF 阅读器",
 
@@ -491,9 +491,9 @@
       "content.playerTranslatedLabel": "Translated",
       "content.playerOriginalLabel": "Original",
       "content.playerTargetLanguageLabel": "Target language",
-      "content.pageRefreshAction": "Refresh page",
+      "content.pageRefreshAction": "Extension reloaded. Click to refresh page",
       "content.extensionReloadedReadyMessage": "The extension has reloaded. Refresh this page before using it again.",
-      "content.extensionReloadedToast": "The extension was just reloaded. Refresh this page and try again.",
+      "content.extensionReloadedToast": "The extension was just reloaded. Refresh this page (or click icon) to continue.",
 
       "popup.pdfReaderButton": "Open PDF Reader",
 
