@@ -242,14 +242,23 @@
             </small>
           </label>
 
-          <label class="field field-full checkbox-field">
-            <span class="checkbox-row">
-              <input id="translationEnabled" name="translationEnabled" type="checkbox" />
-              <strong data-i18n="options.translationTitle">Translate before speaking</strong>
-            </span>
-            <small data-i18n="options.translationDescription">
-              When enabled, the selected text is first translated with an OpenAI-compatible LLM endpoint and then sent to Inworld TTS. Word highlighting is skipped automatically because playback follows the translated text.
-            </small>
+          <div class="field-full section-divider"></div>
+          <div class="field-full section-head">
+            <h3 data-i18n="options.translationHeading">翻译设置</h3>
+            <p data-i18n="options.translationHeadingNote">
+              独立配置翻译 API（兼容 OpenAI 规范，支持 DeepSeek、SiliconFlow、OpenAI、Ollama 本地模型），供划词翻译与译后朗读使用。
+            </p>
+          </div>
+
+          <label class="field">
+            <span data-i18n="options.translationPresetLabel">预设服务商</span>
+            <select id="translationPreset" name="translationPreset">
+              <option value="custom" data-i18n="options.translationPresetCustom">自定义 (Custom)</option>
+              <option value="deepseek" data-i18n="options.translationPresetDeepSeek">DeepSeek (deepseek-chat)</option>
+              <option value="siliconflow" data-i18n="options.translationPresetSiliconFlow">硅基流动 SiliconFlow (Qwen2.5-7B)</option>
+              <option value="openai" data-i18n="options.translationPresetOpenAI">OpenAI (gpt-4o-mini)</option>
+              <option value="ollama" data-i18n="options.translationPresetOllama">Ollama 本地 (qwen2.5:7b)</option>
+            </select>
           </label>
 
           <label class="field">
@@ -260,7 +269,7 @@
               type="text"
               autocomplete="off"
               data-i18n-placeholder="options.translationTargetLanguagePlaceholder"
-              placeholder="For example: Japanese, English, Simplified Chinese"
+              placeholder="例如 简体中文、English、Japanese"
             />
           </label>
 
@@ -272,7 +281,19 @@
               type="text"
               autocomplete="off"
               data-i18n-placeholder="options.translationModelPlaceholder"
-              placeholder="For example: gpt-4.1-mini or your compatible model name"
+              placeholder="例如 deepseek-chat、gpt-4o-mini 或兼容模型名"
+            />
+          </label>
+
+          <label class="field">
+            <span data-i18n="options.translationApiKeyLabel">LLM API Key</span>
+            <input
+              id="translationApiKey"
+              name="translationApiKey"
+              type="password"
+              autocomplete="off"
+              data-i18n-placeholder="options.translationApiKeyPlaceholder"
+              placeholder="输入翻译服务的 API Key（本地 Ollama 可留空）"
             />
           </label>
 
@@ -284,21 +305,26 @@
               type="url"
               autocomplete="off"
               data-i18n-placeholder="options.translationApiUrlPlaceholder"
-              placeholder="https://api.openai.com/v1/chat/completions"
+              placeholder="https://api.deepseek.com/chat/completions"
             />
           </label>
 
-          <label class="field field-full">
-            <span data-i18n="options.translationApiKeyLabel">LLM API Key</span>
-            <input
-              id="translationApiKey"
-              name="translationApiKey"
-              type="password"
-              autocomplete="off"
-              data-i18n-placeholder="options.translationApiKeyPlaceholder"
-              placeholder="Optional. Fill this in if your LLM service requires authentication."
-            />
+          <label class="field field-full checkbox-field">
+            <span class="checkbox-row">
+              <input id="translationEnabled" name="translationEnabled" type="checkbox" />
+              <strong data-i18n="options.translationTitle">Translate before speaking</strong>
+            </span>
+            <small data-i18n="options.translationDescription">
+              启用后会先把选中文本发送到翻译 API 翻译成目标语言，再交给 TTS 朗读。由于朗读内容已经变成译文，逐词高亮会自动跳过。
+            </small>
           </label>
+
+          <div class="field-full test-translation-row">
+            <button id="testTranslationButton" type="button" class="secondary" data-i18n="options.testTranslationButton">
+              测试翻译
+            </button>
+            <span id="testTranslationStatus" class="translation-status"></span>
+          </div>
 
           <div class="actions field-full">
             <button id="saveButton" type="submit" class="primary" data-i18n="options.saveButton">

@@ -100,6 +100,55 @@ h1 {
   grid-column: 1 / -1;
 }
 
+.section-divider {
+  height: 1px;
+  background: var(--line);
+  margin: 14px 0 6px;
+}
+
+.section-head {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.section-head h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.section-head p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.test-translation-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.translation-status {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.translation-status.is-success {
+  color: #0f766e;
+  font-weight: 500;
+}
+
+.translation-status.is-error {
+  color: #b91c1c;
+  font-weight: 500;
+}
+
 .field span {
   font-size: 13px;
   font-weight: 600;

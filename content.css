@@ -16,6 +16,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
   animation: inworld-pop-in 140ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -84,6 +85,233 @@
   height: 15px;
   display: block;
   pointer-events: none;
+}
+
+#readmate-translate-button {
+  box-sizing: border-box;
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  min-height: 30px;
+  padding: 0;
+  border: 1.5px solid rgba(255, 255, 255, 0.95);
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.25), 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: transform 120ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 120ms ease, opacity 120ms ease;
+  outline: none;
+}
+
+#readmate-translate-button:hover {
+  transform: scale(1.15);
+  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4), 0 2px 4px rgba(0, 0, 0, 0.12);
+}
+
+#readmate-translate-button:active {
+  transform: scale(0.92);
+}
+
+#readmate-translate-button:disabled {
+  cursor: wait;
+  opacity: 0.85;
+  transform: none;
+}
+
+#readmate-translate-button svg {
+  width: 15px;
+  height: 15px;
+  display: block;
+  pointer-events: none;
+}
+
+#readmate-translation-card {
+  position: absolute;
+  z-index: 2147483646;
+  display: none;
+  box-sizing: border-box;
+  width: min(360px, calc(100vw - 32px));
+  max-width: 380px;
+  padding: 12px 14px;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.18), 0 2px 8px rgba(0, 0, 0, 0.06);
+  backdrop-filter: blur(16px);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: #0f172a;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+#readmate-translation-card.readmate-visible {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: readmate-card-pop 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes readmate-card-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(4px) scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.readmate-trans-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.readmate-trans-title-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.readmate-trans-badge {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #4f46e5;
+  background: #eef2ff;
+  padding: 2px 7px;
+  border-radius: 6px;
+  line-height: 1.3;
+}
+
+.readmate-trans-lang {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.readmate-trans-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.readmate-trans-action-btn {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+
+.readmate-trans-action-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.readmate-trans-action-btn:active {
+  transform: scale(0.92);
+}
+
+.readmate-trans-action-btn svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+.readmate-trans-body {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: #1e293b;
+  max-height: 220px;
+  overflow-y: auto;
+  word-break: break-word;
+  white-space: pre-wrap;
+  padding: 2px 0;
+}
+
+.readmate-trans-body.readmate-trans-error {
+  color: #dc2626;
+  font-size: 13px;
+}
+
+.readmate-trans-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 6px;
+  border-top: 1px solid #f1f5f9;
+  margin-top: 2px;
+}
+
+.readmate-trans-speak-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #0f766e;
+  background: #f0fdfa;
+  border: 1px solid #ccfbf1;
+  padding: 4px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 120ms ease;
+  line-height: 1.4;
+}
+
+.readmate-trans-speak-btn:hover {
+  background: #0d9488;
+  color: #ffffff;
+  border-color: #0d9488;
+}
+
+.readmate-trans-speak-btn svg {
+  width: 13px;
+  height: 13px;
+}
+
+.readmate-trans-model {
+  font-size: 11px;
+  color: #94a3b8;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.readmate-trans-settings-btn {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffffff;
+  background: #4f46e5;
+  border: none;
+  padding: 5px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+
+.readmate-trans-settings-btn:hover {
+  background: #4338ca;
 }
 
 #inworld-tts-meta {

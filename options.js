@@ -24,12 +24,32 @@ const DEFAULT_SETTINGS = {
   enableWordHighlight: true,
   autoPlayOnSelection: false,
   keepPlayerVisibleAfterPlayback: false,
+  translationProviderPreset: "custom",
   translationEnabled: false,
   translationTargetLanguage: "",
   translationApiUrl: DEFAULT_TRANSLATION_API_URL,
   translationApiKey: "",
   translationModel: "",
   uiLanguage: InworldI18n.getInitialUiLanguage(),
+};
+
+const TRANSLATION_PRESETS = {
+  deepseek: {
+    apiUrl: "https://api.deepseek.com/chat/completions",
+    model: "deepseek-chat",
+  },
+  siliconflow: {
+    apiUrl: "https://api.siliconflow.cn/v1/chat/completions",
+    model: "Qwen/Qwen2.5-7B-Instruct",
+  },
+  openai: {
+    apiUrl: "https://api.openai.com/v1/chat/completions",
+    model: "gpt-4o-mini",
+  },
+  ollama: {
+    apiUrl: "http://localhost:11434/v1/chat/completions",
+    model: "qwen2.5:7b",
+  },
 };
 
 const form = document.getElementById("settings-form");
@@ -60,11 +80,14 @@ const fishVoiceIdInput = document.getElementById("fishVoiceId");
 const enableWordHighlightInput = document.getElementById("enableWordHighlight");
 const autoPlayOnSelectionInput = document.getElementById("autoPlayOnSelection");
 const keepPlayerVisibleAfterPlaybackInput = document.getElementById("keepPlayerVisibleAfterPlayback");
+const translationPresetSelect = document.getElementById("translationPreset");
 const translationEnabledInput = document.getElementById("translationEnabled");
 const translationTargetLanguageInput = document.getElementById("translationTargetLanguage");
 const translationApiUrlInput = document.getElementById("translationApiUrl");
 const translationApiKeyInput = document.getElementById("translationApiKey");
 const translationModelInput = document.getElementById("translationModel");
+const testTranslationButton = document.getElementById("testTranslationButton");
+const testTranslationStatus = document.getElementById("testTranslationStatus");
 const loadVoicesButton = document.getElementById("loadVoicesButton");
 const saveButton = document.getElementById("saveButton");
 const statusMessage = document.getElementById("statusMessage");
@@ -106,6 +129,29 @@ async function initialize() {
   uiLanguageInput.addEventListener("change", () => {
     currentUiLanguage = normalizeUiLanguage(uiLanguageInput.value);
     applyPageTranslations();
+  });
+
+  translationPresetSelect.addEventListener("change", () => {
+    const preset = TRANSLATION_PRESETS[translationPresetSelect.value];
+    if (preset) {
+      translationApiUrlInput.value = preset.apiUrl;
+      translationModelInput.value = preset.model;
+    }
+  });
+
+  [translationApiUrlInput, translationModelInput].forEach((input) => {
+    input.addEventListener("input", () => {
+      const url = translationApiUrlInput.value.trim();
+      const mod = translationModelInput.value.trim();
+      const matched = Object.keys(TRANSLATION_PRESETS).find(
+        (k) => TRANSLATION_PRESETS[k].apiUrl === url && TRANSLATION_PRESETS[k].model === mod,
+      );
+      translationPresetSelect.value = matched || "custom";
+    });
+  });
+
+  testTranslationButton.addEventListener("click", async () => {
+    await testTranslation();
   });
 
   translationEnabledInput.addEventListener("change", () => {
@@ -171,11 +217,13 @@ async function loadSettingsIntoForm() {
   enableWordHighlightInput.checked = Boolean(merged.enableWordHighlight);
   autoPlayOnSelectionInput.checked = Boolean(merged.autoPlayOnSelection);
   keepPlayerVisibleAfterPlaybackInput.checked = Boolean(merged.keepPlayerVisibleAfterPlayback);
+  translationPresetSelect.value = merged.translationProviderPreset || "custom";
   translationEnabledInput.checked = Boolean(merged.translationEnabled);
-  translationTargetLanguageInput.value = merged.translationTargetLanguage;
+  translationTargetLanguageInput.value =
+    merged.translationTargetLanguage || (currentUiLanguage === "zh-CN" ? "简体中文" : "English");
   translationApiUrlInput.value = merged.translationApiUrl || DEFAULT_TRANSLATION_API_URL;
-  translationApiKeyInput.value = merged.translationApiKey;
-  translationModelInput.value = merged.translationModel;
+  translationApiKeyInput.value = merged.translationApiKey || "";
+  translationModelInput.value = merged.translationModel || "";
 
   updateProviderVisibility();
   applyPageTranslations();
@@ -207,6 +255,7 @@ function collectSettingsFromForm() {
     enableWordHighlight: enableWordHighlightInput.checked,
     autoPlayOnSelection: autoPlayOnSelectionInput.checked,
     keepPlayerVisibleAfterPlayback: keepPlayerVisibleAfterPlaybackInput.checked,
+    translationProviderPreset: translationPresetSelect.value,
     translationEnabled: translationEnabledInput.checked,
     translationTargetLanguage: translationTargetLanguageInput.value.trim(),
     translationApiUrl: translationApiUrlInput.value.trim() || DEFAULT_TRANSLATION_API_URL,
@@ -255,25 +304,24 @@ function validateSettings(settings) {
     }
   }
 
-  if (!settings.translationEnabled) {
-    return "";
-  }
-
-  if (!settings.translationTargetLanguage) {
-    return t("options.validationTranslationLanguage");
-  }
-
-  if (!settings.translationModel) {
-    return t("options.validationTranslationModel");
-  }
-
-  try {
-    const url = new URL(settings.translationApiUrl);
-    if (!["http:", "https:"].includes(url.protocol)) {
-      return t("options.validationTranslationApiUrlProtocol");
+  if (settings.translationEnabled) {
+    if (!settings.translationTargetLanguage) {
+      return t("options.validationTranslationLanguage");
     }
-  } catch (_error) {
-    return t("options.validationTranslationApiUrlFormat");
+    if (!settings.translationModel) {
+      return t("options.validationTranslationModel");
+    }
+  }
+
+  if (settings.translationApiUrl) {
+    try {
+      const url = new URL(settings.translationApiUrl);
+      if (!["http:", "https:"].includes(url.protocol)) {
+        return t("options.validationTranslationApiUrlProtocol");
+      }
+    } catch (_error) {
+      return t("options.validationTranslationApiUrlFormat");
+    }
   }
 
   return "";
@@ -480,17 +528,56 @@ function syncTestTextDefault() {
 }
 
 function updateTranslationFieldState() {
-  const disabled = !translationEnabledInput.checked;
+  // Translation fields remain accessible at all times because they power
+  // both the selection translate button and the 'translate before speaking' mode.
+}
 
-  [
-    translationTargetLanguageInput,
-    translationApiUrlInput,
-    translationApiKeyInput,
-    translationModelInput,
-  ].forEach((input) => {
-    input.disabled = disabled;
-    input.closest(".field")?.classList.toggle("is-disabled", disabled);
-  });
+async function testTranslation() {
+  const text = testText.value.trim() || t("options.testTextDefault");
+  const settings = collectSettingsFromForm();
+
+  if (!settings.translationModel) {
+    setTranslationStatus(t("background.fillTranslationModel"), "error");
+    return;
+  }
+
+  testTranslationButton.disabled = true;
+  setTranslationStatus(t("options.testingTranslation"));
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: "TEST_TRANSLATION",
+      text,
+      overrides: settings,
+    });
+
+    if (!response?.ok) {
+      throw new Error(response?.error || t("options.testTranslationFailed"));
+    }
+
+    setTranslationStatus(
+      t("options.testTranslationSuccess", { result: response.result.text }),
+      "success",
+    );
+  } catch (error) {
+    setTranslationStatus(
+      error instanceof Error ? error.message : t("options.testTranslationFailed"),
+      "error",
+    );
+  } finally {
+    testTranslationButton.disabled = false;
+  }
+}
+
+function setTranslationStatus(message, tone = "") {
+  testTranslationStatus.textContent = message;
+  testTranslationStatus.className = "translation-status";
+  if (tone === "error") {
+    testTranslationStatus.classList.add("is-error");
+  }
+  if (tone === "success") {
+    testTranslationStatus.classList.add("is-success");
+  }
 }
 
 function setStatus(message, tone = "") {

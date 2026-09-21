@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "ReadMate - AI Selection TTS & Read-Along",
   "description": "Select text on any page and read it aloud with AI TTS and word highlighting.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "permissions": [
     "storage",
     "contextMenus",

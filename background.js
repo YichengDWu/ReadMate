@@ -35,6 +35,7 @@ const DEFAULT_SETTINGS = {
   enableWordHighlight: true,
   autoPlayOnSelection: false,
   keepPlayerVisibleAfterPlayback: false,
+  translationProviderPreset: "custom",
   translationEnabled: false,
   translationTargetLanguage: "",
   translationApiUrl: DEFAULT_TRANSLATION_API_URL,
@@ -193,6 +194,14 @@ async function handleMessage(message) {
     }
     case "SPEAK_TEXT": {
       const result = await synthesizeSpeech(message?.text ?? "", message?.overrides ?? {});
+      return { result };
+    }
+    case "TRANSLATE_TEXT": {
+      const result = await translateText(message?.text ?? "", message?.overrides ?? {});
+      return { result };
+    }
+    case "TEST_TRANSLATION": {
+      const result = await translateText(message?.text ?? "Hello, world!", message?.overrides ?? {});
       return { result };
     }
     case "OPEN_OPTIONS": {
@@ -955,6 +964,41 @@ async function maybeTranslateText(text, settings) {
   return {
     applied: true,
     text: translatedText,
+    targetLanguage,
+    model,
+  };
+}
+
+async function translateText(rawText, overrides = {}) {
+  const baseSettings = await getSettings();
+  const settings = { ...baseSettings, ...overrides };
+  const language = getUiLanguage(settings);
+  const text = String(rawText ?? "").trim();
+  if (!text) {
+    throw new Error(t(language, "background.noSpeakableText"));
+  }
+
+  const model = String(settings.translationModel ?? "").trim();
+  if (!model) {
+    throw new Error(t(language, "background.fillTranslationConfigInSettings"));
+  }
+
+  const targetLanguage =
+    String(settings.translationTargetLanguage ?? "").trim() ||
+    (language === "zh-CN" ? "中文" : "English");
+
+  const apiUrl = normalizeTranslationApiUrl(settings.translationApiUrl, language);
+  const translatedText = await translateTextWithLlm(text, {
+    apiKey: String(settings.translationApiKey ?? "").trim(),
+    apiUrl,
+    model,
+    targetLanguage,
+    language,
+  });
+
+  return {
+    text: translatedText,
+    originalText: text,
     targetLanguage,
     model,
   };

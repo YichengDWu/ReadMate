@@ -61,6 +61,36 @@ const REFRESH_ICON_SVG =
   '<path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>' +
   "</svg>";
 
+const TRANSLATE_ICON_SVG =
+  '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+  '<path d="m5 8 6 6"></path>' +
+  '<path d="m4 14 6-6 2-3"></path>' +
+  '<path d="M2 5h12"></path>' +
+  '<path d="M7 2h1"></path>' +
+  '<path d="m22 22-5-10-5 10"></path>' +
+  '<path d="M14 18h6"></path>' +
+  "</svg>";
+
+const COPY_ICON_SVG =
+  '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+  '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect>' +
+  '<path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>' +
+  "</svg>";
+
+const CHECK_ICON_SVG =
+  '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">' +
+  '<polyline points="20 6 9 17 4 12"></polyline>' +
+  "</svg>";
+
+const CLOSE_ICON_SVG =
+  '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+  '<line x1="18" y1="6" x2="6" y2="18"></line>' +
+  '<line x1="6" y1="6" x2="18" y2="18"></line>' +
+  "</svg>";
+
+let currentTranslationData = null;
+let isTranslating = false;
+
 const bubble = document.createElement("div");
 bubble.id = "inworld-tts-bubble";
 
@@ -70,6 +100,13 @@ actionButton.type = "button";
 actionButton.innerHTML = SPEAKER_ICON_SVG;
 actionButton.title = t("content.speakAction");
 actionButton.setAttribute("aria-label", t("content.speakAction"));
+
+const translateButton = document.createElement("button");
+translateButton.id = "readmate-translate-button";
+translateButton.type = "button";
+translateButton.innerHTML = TRANSLATE_ICON_SVG;
+translateButton.title = t("content.translateAction");
+translateButton.setAttribute("aria-label", t("content.translateAction"));
 
 const meta = document.createElement("div");
 meta.id = "inworld-tts-meta";
@@ -82,11 +119,77 @@ const metaBody = document.createElement("span");
 metaBody.textContent = t("content.defaultMeta");
 meta.appendChild(metaBody);
 
-bubble.append(actionButton, meta);
+bubble.append(actionButton, translateButton, meta);
 document.documentElement.appendChild(bubble);
 
 bubble.addEventListener("mousedown", (event) => {
   event.preventDefault();
+});
+
+const translationCard = document.createElement("div");
+translationCard.id = "readmate-translation-card";
+
+const translationCardHead = document.createElement("div");
+translationCardHead.className = "readmate-trans-head";
+
+const translationCardTitleRow = document.createElement("div");
+translationCardTitleRow.className = "readmate-trans-title-row";
+
+const translationCardBadge = document.createElement("span");
+translationCardBadge.className = "readmate-trans-badge";
+translationCardBadge.textContent = t("content.translationCardTitle");
+
+const translationCardLang = document.createElement("span");
+translationCardLang.className = "readmate-trans-lang";
+
+translationCardTitleRow.append(translationCardBadge, translationCardLang);
+
+const translationCardActions = document.createElement("div");
+translationCardActions.className = "readmate-trans-actions";
+
+const translationCopyButton = document.createElement("button");
+translationCopyButton.type = "button";
+translationCopyButton.className = "readmate-trans-action-btn";
+translationCopyButton.id = "readmate-trans-copy-btn";
+translationCopyButton.title = t("content.translationCopy");
+translationCopyButton.setAttribute("aria-label", t("content.translationCopy"));
+translationCopyButton.innerHTML = COPY_ICON_SVG;
+
+const translationCloseButton = document.createElement("button");
+translationCloseButton.type = "button";
+translationCloseButton.className = "readmate-trans-action-btn";
+translationCloseButton.id = "readmate-trans-close-btn";
+translationCloseButton.title = t("content.translationClose");
+translationCloseButton.setAttribute("aria-label", t("content.translationClose"));
+translationCloseButton.innerHTML = CLOSE_ICON_SVG;
+
+translationCardActions.append(translationCopyButton, translationCloseButton);
+translationCardHead.append(translationCardTitleRow, translationCardActions);
+
+const translationCardBody = document.createElement("div");
+translationCardBody.className = "readmate-trans-body";
+translationCardBody.id = "readmate-trans-body";
+
+const translationCardFooter = document.createElement("div");
+translationCardFooter.className = "readmate-trans-footer";
+translationCardFooter.id = "readmate-trans-footer";
+
+const translationSpeakButton = document.createElement("button");
+translationSpeakButton.type = "button";
+translationSpeakButton.className = "readmate-trans-speak-btn";
+translationSpeakButton.id = "readmate-trans-speak-btn";
+translationSpeakButton.innerHTML = SPEAKER_ICON_SVG + `<span>${t("content.translationSpeak")}</span>`;
+
+const translationModelBadge = document.createElement("span");
+translationModelBadge.className = "readmate-trans-model";
+translationModelBadge.id = "readmate-trans-model";
+
+translationCardFooter.append(translationSpeakButton, translationModelBadge);
+translationCard.append(translationCardHead, translationCardBody, translationCardFooter);
+document.documentElement.appendChild(translationCard);
+
+translationCard.addEventListener("mousedown", (event) => {
+  event.stopPropagation();
 });
 
 const toast = document.createElement("div");
@@ -213,6 +316,65 @@ actionButton.addEventListener("click", (event) => {
   });
 });
 
+translateButton.addEventListener("click", async (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+
+  if (!hasExtensionContext()) {
+    handleExtensionContextLoss();
+    return;
+  }
+
+  if (isTranslating) {
+    return;
+  }
+
+  await triggerSelectionTranslation();
+});
+
+translationCloseButton.addEventListener("click", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  hideTranslationCard();
+});
+
+let copyFeedbackTimer = null;
+translationCopyButton.addEventListener("click", async (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  if (!currentTranslationData?.translatedText) {
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(currentTranslationData.translatedText);
+    translationCopyButton.innerHTML = CHECK_ICON_SVG;
+    translationCopyButton.title = t("content.translationCopied");
+    window.clearTimeout(copyFeedbackTimer);
+    copyFeedbackTimer = window.setTimeout(() => {
+      translationCopyButton.innerHTML = COPY_ICON_SVG;
+      translationCopyButton.title = t("content.translationCopy");
+    }, 1500);
+  } catch (_err) {
+    showToast(t("content.operationFailed") || "复制失败");
+  }
+});
+
+translationSpeakButton.addEventListener("click", async (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  if (!currentTranslationData?.translatedText) {
+    return;
+  }
+  await speakCustomText(currentTranslationData.translatedText);
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    hideTranslationCard();
+  }
+});
+
 document.addEventListener("mouseup", handleSelectionGesture, true);
 document.addEventListener("keyup", handleSelectionGesture, true);
 document.addEventListener("scroll", () => {
@@ -221,9 +383,14 @@ document.addEventListener("scroll", () => {
   }
 }, true);
 document.addEventListener("mousedown", (event) => {
-  if (bubble.contains(event.target) || miniPlayer.contains(event.target)) {
+  if (
+    bubble.contains(event.target) ||
+    miniPlayer.contains(event.target) ||
+    translationCard.contains(event.target)
+  ) {
     return;
   }
+  hideTranslationCard();
   if (!isPlaying) {
     queueSelectionRefresh();
   }
@@ -1379,17 +1546,18 @@ function showBubble(rect) {
     return;
   }
 
-  const iconSize = 30;
+  const bubbleWidth = 68;
+  const bubbleHeight = 30;
   const gap = 6;
   let left = window.scrollX + rect.right - 14;
   left = Math.min(
-    window.scrollX + window.innerWidth - iconSize - 12,
+    window.scrollX + window.innerWidth - bubbleWidth - 12,
     Math.max(window.scrollX + 12, left),
   );
 
   let top = window.scrollY + rect.bottom + gap;
-  if (top + iconSize + 12 > window.scrollY + window.innerHeight && rect.top - iconSize - gap > 0) {
-    top = Math.max(window.scrollY + 12, window.scrollY + rect.top - iconSize - gap);
+  if (top + bubbleHeight + 12 > window.scrollY + window.innerHeight && rect.top - bubbleHeight - gap > 0) {
+    top = Math.max(window.scrollY + 12, window.scrollY + rect.top - bubbleHeight - gap);
   }
 
   bubble.style.left = `${left}px`;
@@ -1399,6 +1567,194 @@ function showBubble(rect) {
 
 function hideBubble() {
   bubble.classList.remove("inworld-visible");
+}
+
+function showTranslationCard({ originalText, translatedText, targetLanguage, model, rect }) {
+  currentTranslationData = { originalText, translatedText, targetLanguage, model };
+
+  translationCardBadge.textContent = t("content.translationCardTitle");
+  translationCardLang.textContent = targetLanguage || "";
+  translationCardBody.textContent = translatedText;
+  translationCardBody.className = "readmate-trans-body";
+  translationModelBadge.textContent = model ? `Model: ${model}` : "";
+
+  translationCardFooter.innerHTML = "";
+  translationCardFooter.style.display = "flex";
+  translationCardFooter.append(translationSpeakButton, translationModelBadge);
+
+  positionTranslationCard(rect);
+  translationCard.classList.add("readmate-visible");
+}
+
+function showTranslationErrorCard(errorMessage, rect) {
+  currentTranslationData = null;
+
+  const isConfigMissing =
+    errorMessage.includes("设置") ||
+    errorMessage.includes("settings") ||
+    errorMessage.includes("模型") ||
+    errorMessage.includes("model");
+
+  translationCardBadge.textContent = t("content.translationFailed");
+  translationCardLang.textContent = "";
+  translationCardBody.className = "readmate-trans-body readmate-trans-error";
+  translationCardBody.textContent = isConfigMissing
+    ? t("content.translationConfigMissing")
+    : errorMessage;
+
+  translationCardFooter.innerHTML = "";
+  translationCardFooter.style.display = "flex";
+
+  if (isConfigMissing) {
+    const openSettingsBtn = document.createElement("button");
+    openSettingsBtn.type = "button";
+    openSettingsBtn.className = "readmate-trans-settings-btn";
+    openSettingsBtn.textContent = t("content.translationOpenSettings");
+    openSettingsBtn.addEventListener("click", () => {
+      void safeRuntimeSendMessage({ type: "OPEN_OPTIONS" });
+      hideTranslationCard();
+    });
+    translationCardFooter.appendChild(openSettingsBtn);
+  } else {
+    const retryBtn = document.createElement("button");
+    retryBtn.type = "button";
+    retryBtn.className = "readmate-trans-settings-btn";
+    retryBtn.textContent = t("content.translationRetry");
+    retryBtn.addEventListener("click", () => {
+      hideTranslationCard();
+      void triggerSelectionTranslation();
+    });
+    translationCardFooter.appendChild(retryBtn);
+  }
+
+  positionTranslationCard(rect);
+  translationCard.classList.add("readmate-visible");
+}
+
+function positionTranslationCard(rect) {
+  if (!rect) {
+    rect = currentSelectionRect;
+  }
+  const cardWidth = 340;
+  const gap = 8;
+  let left = window.scrollX + (rect ? rect.left : 20);
+  left = Math.min(
+    window.scrollX + window.innerWidth - cardWidth - 16,
+    Math.max(window.scrollX + 16, left),
+  );
+
+  let top = window.scrollY + (rect ? rect.bottom : 20) + gap;
+  if (top + 220 > window.scrollY + window.innerHeight && rect && rect.top - 220 > 0) {
+    top = Math.max(window.scrollY + 10, window.scrollY + rect.top - 220);
+  }
+
+  translationCard.style.left = `${left}px`;
+  translationCard.style.top = `${top}px`;
+}
+
+function hideTranslationCard() {
+  translationCard.classList.remove("readmate-visible");
+}
+
+async function triggerSelectionTranslation() {
+  const latestSelection = readSelection();
+  if (latestSelection.text) {
+    currentSelectionText = latestSelection.text;
+    currentSelectionRect = latestSelection.rect;
+    currentSelectionSnapshot = latestSelection;
+  }
+
+  if (!currentSelectionText) {
+    showToast(t("content.noSelection"));
+    return;
+  }
+
+  isTranslating = true;
+  translateButton.disabled = true;
+  translateButton.innerHTML = LOADING_ICON_SVG;
+
+  const textToTranslate = currentSelectionText;
+  const targetRect = currentSelectionRect;
+
+  try {
+    const response = await safeRuntimeSendMessage({
+      type: "TRANSLATE_TEXT",
+      text: textToTranslate,
+    });
+
+    if (!response?.ok) {
+      throw new Error(response?.error || t("content.translationFailed"));
+    }
+
+    showTranslationCard({
+      originalText: textToTranslate,
+      translatedText: response.result.text,
+      targetLanguage: response.result.targetLanguage,
+      model: response.result.model,
+      rect: targetRect,
+    });
+  } catch (error) {
+    if (isExtensionContextInvalidatedError(error)) {
+      handleExtensionContextLoss();
+      return;
+    }
+    showTranslationErrorCard(error?.message || t("content.translationFailed"), targetRect);
+  } finally {
+    isTranslating = false;
+    translateButton.disabled = false;
+    translateButton.innerHTML = TRANSLATE_ICON_SVG;
+  }
+}
+
+async function speakCustomText(text, overrides = {}) {
+  if (isBusy) {
+    return;
+  }
+
+  if (!hasExtensionContext()) {
+    handleExtensionContextLoss();
+    return;
+  }
+
+  const cleanText = String(text ?? "").trim();
+  if (!cleanText) {
+    return;
+  }
+
+  isBusy = true;
+  cancelPendingAutoPlay();
+  setMiniPlayerLoadingState(cleanText, {
+    translationEnabled: false,
+    translationTargetLanguage: "",
+  });
+
+  try {
+    const response = await safeRuntimeSendMessage({
+      type: "SPEAK_TEXT",
+      text: cleanText,
+      overrides: {
+        translationEnabled: false,
+        ...overrides,
+      },
+    });
+
+    if (!response?.ok) {
+      throw new Error(response?.error || t("background.readFailedCheckConfig"));
+    }
+
+    await playAudioPayload(response.result);
+  } catch (error) {
+    if (isExtensionContextInvalidatedError(error)) {
+      handleExtensionContextLoss();
+      return;
+    }
+    const message = error instanceof Error ? error.message : t("background.readFailedCheckConfig");
+    hideMiniPlayer();
+    showToast(message);
+  } finally {
+    isBusy = false;
+    updateMiniPlayer();
+  }
 }
 
 async function loadContentSettings() {
@@ -1463,6 +1819,7 @@ function handleExtensionContextLoss() {
   isBusy = false;
   stopPlayback({ refreshSelection: false });
   hideBubble();
+  hideTranslationCard();
   hideMiniPlayer();
   document.removeEventListener("mouseup", handleSelectionGesture, true);
   document.removeEventListener("keyup", handleSelectionGesture, true);
@@ -1470,6 +1827,9 @@ function handleExtensionContextLoss() {
   actionButton.title = t("content.pageRefreshAction");
   actionButton.setAttribute("aria-label", t("content.pageRefreshAction"));
   actionButton.innerHTML = REFRESH_ICON_SVG;
+  translateButton.disabled = true;
+  translateButton.title = t("content.pageRefreshAction");
+  translateButton.setAttribute("aria-label", t("content.pageRefreshAction"));
   metaBody.textContent = t("content.extensionReloadedReadyMessage");
   showToast(t("content.extensionReloadedToast"));
 }
@@ -1482,7 +1842,9 @@ function handleSelectionGesture(event) {
 
   if (
     event?.target &&
-    (bubble.contains(event.target) || miniPlayer.contains(event.target))
+    (bubble.contains(event.target) ||
+      miniPlayer.contains(event.target) ||
+      translationCard.contains(event.target))
   ) {
     return;
   }
@@ -1576,6 +1938,18 @@ function refreshLocalizedUi() {
       detail: t("content.defaultMeta"),
       disabled: false,
     });
+  }
+
+  translateButton.title = t("content.translateAction");
+  translateButton.setAttribute("aria-label", t("content.translateAction"));
+  translationCardBadge.textContent = t("content.translationCardTitle");
+  translationCopyButton.title = t("content.translationCopy");
+  translationCopyButton.setAttribute("aria-label", t("content.translationCopy"));
+  translationCloseButton.title = t("content.translationClose");
+  translationCloseButton.setAttribute("aria-label", t("content.translationClose"));
+  const speakTextSpan = translationSpeakButton.querySelector("span");
+  if (speakTextSpan) {
+    speakTextSpan.textContent = t("content.translationSpeak");
   }
 
   if (!isPlaying && !isBusy && currentSelectionText) {
