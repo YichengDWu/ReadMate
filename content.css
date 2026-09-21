@@ -130,13 +130,13 @@
 }
 
 #readmate-translation-card {
-  position: absolute;
+  position: fixed;
   z-index: 2147483646;
   display: none;
   box-sizing: border-box;
   width: min(360px, calc(100vw - 32px));
   max-width: 380px;
-  padding: 12px 14px;
+  padding: 6px 14px 12px 14px;
   border: 1px solid rgba(226, 232, 240, 0.9);
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.98);
@@ -153,6 +153,45 @@
   flex-direction: column;
   gap: 8px;
   animation: readmate-card-pop 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#readmate-translation-card.is-dragging {
+  cursor: grabbing !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  animation: none !important;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.25), 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.readmate-trans-drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 0 4px 0;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.readmate-trans-drag-bar {
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background: #cbd5e1;
+  transition: background-color 150ms ease, transform 150ms ease;
+}
+
+.readmate-trans-drag-handle:hover .readmate-trans-drag-bar {
+  background: #94a3b8;
+  transform: scaleY(1.25);
+}
+
+#readmate-translation-card.is-dragging .readmate-trans-drag-handle {
+  cursor: grabbing !important;
+}
+
+#readmate-translation-card.is-dragging .readmate-trans-drag-bar {
+  background: #6366f1;
 }
 
 @keyframes readmate-card-pop {
@@ -172,6 +211,13 @@
   justify-content: space-between;
   padding-bottom: 6px;
   border-bottom: 1px solid #f1f5f9;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#readmate-translation-card.is-dragging .readmate-trans-head {
+  cursor: grabbing !important;
 }
 
 .readmate-trans-title-row {

@@ -30,11 +30,14 @@ let isPlaying = false;
 let isPaused = false;
 let hasCompletedPlayback = false;
 let isDraggingPlayer = false;
+let isDraggingTranslationCard = false;
 let isSeeking = false;
 let extensionContextLost = false;
 let currentPlaybackMeta = null;
 let playerDragOffsetX = 0;
 let playerDragOffsetY = 0;
+let translationCardDragOffsetX = 0;
+let translationCardDragOffsetY = 0;
 let lastAutoPlaySelectionKey = "";
 let contentSettings = { ...CONTENT_DEFAULT_SETTINGS };
 
@@ -129,6 +132,15 @@ bubble.addEventListener("mousedown", (event) => {
 const translationCard = document.createElement("div");
 translationCard.id = "readmate-translation-card";
 
+const translationCardDragHandle = document.createElement("div");
+translationCardDragHandle.className = "readmate-trans-drag-handle";
+translationCardDragHandle.setAttribute("role", "toolbar");
+translationCardDragHandle.setAttribute("aria-label", "Drag translation panel");
+
+const translationCardDragBar = document.createElement("div");
+translationCardDragBar.className = "readmate-trans-drag-bar";
+translationCardDragHandle.appendChild(translationCardDragBar);
+
 const translationCardHead = document.createElement("div");
 translationCardHead.className = "readmate-trans-head";
 
@@ -185,8 +197,21 @@ translationModelBadge.className = "readmate-trans-model";
 translationModelBadge.id = "readmate-trans-model";
 
 translationCardFooter.append(translationSpeakButton, translationModelBadge);
-translationCard.append(translationCardHead, translationCardBody, translationCardFooter);
+translationCard.append(
+  translationCardDragHandle,
+  translationCardHead,
+  translationCardBody,
+  translationCardFooter,
+);
 document.documentElement.appendChild(translationCard);
+
+translationCardDragHandle.addEventListener("pointerdown", (event) => {
+  startTranslationCardDrag(event);
+});
+
+translationCardHead.addEventListener("pointerdown", (event) => {
+  startTranslationCardDrag(event);
+});
 
 translationCard.addEventListener("mousedown", (event) => {
   event.stopPropagation();
@@ -279,6 +304,11 @@ miniPlayerProgress.addEventListener("pointerdown", (event) => {
 window.addEventListener("pointermove", (event) => {
   if (isDraggingPlayer) {
     updateMiniPlayerDrag(event);
+    return;
+  }
+
+  if (isDraggingTranslationCard) {
+    updateTranslationCardDrag(event);
     return;
   }
 
@@ -1315,6 +1345,40 @@ function updateMiniPlayerDrag(event) {
   pinMiniPlayer(left, top);
 }
 
+function startTranslationCardDrag(event) {
+  if (event.button !== 0) {
+    return;
+  }
+
+  if (event.target.closest("button") || event.target.closest(".readmate-trans-actions")) {
+    return;
+  }
+
+  const rect = translationCard.getBoundingClientRect();
+  isDraggingTranslationCard = true;
+  translationCardDragOffsetX = event.clientX - rect.left;
+  translationCardDragOffsetY = event.clientY - rect.top;
+  translationCard.classList.add("is-dragging");
+  event.preventDefault();
+}
+
+function updateTranslationCardDrag(event) {
+  const rect = translationCard.getBoundingClientRect();
+  const left = clamp(
+    event.clientX - translationCardDragOffsetX,
+    12,
+    window.innerWidth - rect.width - 12,
+  );
+  const top = clamp(
+    event.clientY - translationCardDragOffsetY,
+    12,
+    window.innerHeight - rect.height - 12,
+  );
+
+  translationCard.style.left = `${left}px`;
+  translationCard.style.top = `${top}px`;
+}
+
 function startSeek(event) {
   if (event.button !== 0 || !audioElement || !Number.isFinite(audioElement.duration)) {
     return;
@@ -1340,6 +1404,11 @@ function finishPointerInteraction(_event) {
   if (isDraggingPlayer) {
     isDraggingPlayer = false;
     miniPlayer.classList.remove("is-dragging");
+  }
+
+  if (isDraggingTranslationCard) {
+    isDraggingTranslationCard = false;
+    translationCard.classList.remove("is-dragging");
   }
 
   if (isSeeking) {
@@ -1670,17 +1739,17 @@ function positionTranslationCard(rect) {
   if (!rect) {
     rect = currentSelectionRect;
   }
-  const cardWidth = 340;
-  const gap = 8;
-  let left = window.scrollX + (rect ? rect.left : 20);
+  const cardWidth = 360;
+  const gap = 10;
+  let left = rect ? rect.left : 20;
   left = Math.min(
-    window.scrollX + window.innerWidth - cardWidth - 16,
-    Math.max(window.scrollX + 16, left),
+    window.innerWidth - cardWidth - 16,
+    Math.max(16, left),
   );
 
-  let top = window.scrollY + (rect ? rect.bottom : 20) + gap;
-  if (top + 220 > window.scrollY + window.innerHeight && rect && rect.top - 220 > 0) {
-    top = Math.max(window.scrollY + 10, window.scrollY + rect.top - 220);
+  let top = (rect ? rect.bottom : 20) + gap;
+  if (top + 260 > window.innerHeight && rect && rect.top - 260 > 0) {
+    top = Math.max(10, rect.top - 260);
   }
 
   translationCard.style.left = `${left}px`;
@@ -1703,6 +1772,8 @@ async function triggerSelectionTranslation() {
     showToast(t("content.noSelection"));
     return;
   }
+
+  hideBubble();
 
   isTranslating = true;
   translateButton.disabled = true;
@@ -1896,7 +1967,7 @@ function scheduleAutoPlayForSelection() {
     return;
   }
 
-  if (extensionContextLost || isBusy || isDraggingPlayer || isSeeking) {
+  if (extensionContextLost || isBusy || isDraggingPlayer || isDraggingTranslationCard || isSeeking) {
     return;
   }
 
