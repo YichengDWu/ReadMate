@@ -93,6 +93,7 @@ const CLOSE_ICON_SVG =
 
 let currentTranslationData = null;
 let isTranslating = false;
+let activeTranslationPort = null;
 
 const bubble = document.createElement("div");
 bubble.id = "inworld-tts-bubble";
@@ -1673,7 +1674,51 @@ function formatTargetLanguageLabel(targetLanguage) {
   return map[targetLanguage] || targetLanguage;
 }
 
+function disconnectActiveTranslationStream() {
+  if (activeTranslationPort) {
+    try {
+      activeTranslationPort.disconnect();
+    } catch (_e) {}
+    activeTranslationPort = null;
+  }
+  isTranslating = false;
+  translateButton.disabled = false;
+}
+
+function startTranslationStreamingCard(rect) {
+  currentTranslationData = null;
+  translationCardBadge.textContent = t("content.translationCardTitle");
+  translationCardLang.textContent = "";
+  translationCardBody.textContent = "";
+  translationCardBody.className = "readmate-trans-body is-streaming";
+  translationModelBadge.textContent = "";
+  translationCardFooter.innerHTML = "";
+  translationCardFooter.style.display = "none";
+
+  positionTranslationCard(rect);
+  translationCard.classList.add("readmate-visible");
+}
+
+function appendTranslationStreamChunk(chunk) {
+  translationCardBody.textContent += chunk;
+  translationCardBody.scrollTop = translationCardBody.scrollHeight;
+}
+
+function finalizeTranslationCard({ originalText, fullText, targetLanguage, model }) {
+  currentTranslationData = { originalText, translatedText: fullText, targetLanguage, model };
+  translationCardBody.classList.remove("is-streaming");
+  if (targetLanguage) {
+    translationCardLang.textContent = formatTargetLanguageLabel(targetLanguage);
+  }
+  translationModelBadge.textContent = model ? `Model: ${model}` : "";
+
+  translationCardFooter.innerHTML = "";
+  translationCardFooter.style.display = "flex";
+  translationCardFooter.append(translationSpeakButton, translationModelBadge);
+}
+
 function showTranslationCard({ originalText, translatedText, targetLanguage, model, rect }) {
+  disconnectActiveTranslationStream();
   currentTranslationData = { originalText, translatedText, targetLanguage, model };
 
   translationCardBadge.textContent = t("content.translationCardTitle");
@@ -1691,7 +1736,9 @@ function showTranslationCard({ originalText, translatedText, targetLanguage, mod
 }
 
 function showTranslationErrorCard(errorMessage, rect) {
+  disconnectActiveTranslationStream();
   currentTranslationData = null;
+  translationCardBody.classList.remove("is-streaming");
 
   const isConfigMissing =
     errorMessage.includes("设置") ||
@@ -1764,10 +1811,14 @@ function positionTranslationCard(rect) {
 }
 
 function hideTranslationCard() {
+  disconnectActiveTranslationStream();
   translationCard.classList.remove("readmate-visible");
+  translationCardBody.classList.remove("is-streaming");
 }
 
 async function triggerSelectionTranslation() {
+  disconnectActiveTranslationStream();
+
   const latestSelection = readSelection();
   if (latestSelection.text) {
     currentSelectionText = latestSelection.text;
@@ -1780,75 +1831,60 @@ async function triggerSelectionTranslation() {
     return;
   }
 
-  isTranslating = true;
-  translateButton.disabled = true;
-  translateButton.innerHTML = LOADING_ICON_SVG;
-
   const textToTranslate = currentSelectionText;
   const targetRect = currentSelectionRect;
 
+  // Immediately hide selection bubble and open translation card with streaming indicator!
+  hideBubble();
+  startTranslationStreamingCard(targetRect);
+
+  isTranslating = true;
+  translateButton.disabled = true;
+
   try {
-    const response = await safeRuntimeSendMessage({
-      type: "TRANSLATE_TEXT",
+    const port = chrome.runtime.connect({ name: "readmate-translate-stream" });
+    activeTranslationPort = port;
+
+    port.onDisconnect.addListener(() => {
+      if (activeTranslationPort === port) {
+        activeTranslationPort = null;
+      }
+      isTranslating = false;
+      translateButton.disabled = false;
+    });
+
+    port.onMessage.addListener((msg) => {
+      if (msg.type === "STREAM_START") {
+        if (msg.targetLanguage) {
+          translationCardLang.textContent = formatTargetLanguageLabel(msg.targetLanguage);
+        }
+      } else if (msg.type === "STREAM_CHUNK") {
+        appendTranslationStreamChunk(msg.chunk);
+      } else if (msg.type === "STREAM_DONE") {
+        finalizeTranslationCard({
+          originalText: textToTranslate,
+          fullText: msg.fullText,
+          targetLanguage: msg.targetLanguage,
+          model: msg.model,
+        });
+        disconnectActiveTranslationStream();
+      } else if (msg.type === "STREAM_ERROR") {
+        disconnectActiveTranslationStream();
+        showTranslationErrorCard(msg.error || t("content.translationFailed"), targetRect);
+      }
+    });
+
+    port.postMessage({
+      type: "START_TRANSLATE_STREAM",
       text: textToTranslate,
     });
-
-    if (!response?.ok) {
-      throw new Error(response?.error || t("content.translationFailed"));
-    }
-
-    let freshRect = targetRect;
-    if (currentSelectionSnapshot?.range) {
-      try {
-        const clientRects = Array.from(currentSelectionSnapshot.range.getClientRects()).filter(
-          (r) => r.width > 0 && r.height > 0,
-        );
-        const lastRect = clientRects.length > 0 ? clientRects[clientRects.length - 1] : null;
-        freshRect = lastRect || currentSelectionSnapshot.range.getBoundingClientRect() || targetRect;
-      } catch (_e) {
-        freshRect = targetRect;
-      }
-    } else if (currentSelectionSnapshot?.inputElement) {
-      try {
-        freshRect = currentSelectionSnapshot.inputElement.getBoundingClientRect() || targetRect;
-      } catch (_e) {
-        freshRect = targetRect;
-      }
-    }
-
-    hideBubble();
-    showTranslationCard({
-      originalText: textToTranslate,
-      translatedText: response.result.text,
-      targetLanguage: response.result.targetLanguage,
-      model: response.result.model,
-      rect: freshRect,
-    });
   } catch (error) {
+    disconnectActiveTranslationStream();
     if (isExtensionContextInvalidatedError(error)) {
       handleExtensionContextLoss();
       return;
     }
-
-    let freshRect = targetRect;
-    if (currentSelectionSnapshot?.range) {
-      try {
-        const clientRects = Array.from(currentSelectionSnapshot.range.getClientRects()).filter(
-          (r) => r.width > 0 && r.height > 0,
-        );
-        const lastRect = clientRects.length > 0 ? clientRects[clientRects.length - 1] : null;
-        freshRect = lastRect || currentSelectionSnapshot.range.getBoundingClientRect() || targetRect;
-      } catch (_e) {
-        freshRect = targetRect;
-      }
-    }
-
-    hideBubble();
-    showTranslationErrorCard(error?.message || t("content.translationFailed"), freshRect);
-  } finally {
-    isTranslating = false;
-    translateButton.disabled = false;
-    translateButton.innerHTML = TRANSLATE_ICON_SVG;
+    showTranslationErrorCard(error?.message || t("content.translationFailed"), targetRect);
   }
 }
 

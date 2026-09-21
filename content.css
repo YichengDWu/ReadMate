@@ -286,10 +286,31 @@
   line-height: 1.6;
   color: #1e293b;
   max-height: 220px;
+  min-height: 24px;
   overflow-y: auto;
   word-break: break-word;
   white-space: pre-wrap;
   padding: 2px 0;
+}
+
+.readmate-trans-body.is-streaming::after {
+  content: "▋";
+  display: inline-block;
+  margin-left: 2px;
+  color: #6366f1;
+  font-size: 0.85em;
+  line-height: 1;
+  vertical-align: baseline;
+  animation: readmate-cursor-blink 800ms infinite ease-in-out;
+}
+
+@keyframes readmate-cursor-blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.15;
+  }
 }
 
 .readmate-trans-body.readmate-trans-error {

@@ -182,6 +182,80 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return true;
 });
 
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name === "readmate-translate-stream") {
+    const abortController = new AbortController();
+
+    port.onDisconnect.addListener(() => {
+      abortController.abort();
+    });
+
+    port.onMessage.addListener(async (message) => {
+      if (message?.type === "START_TRANSLATE_STREAM") {
+        try {
+          const baseSettings = await getSettings();
+          const settings = { ...baseSettings, ...(message.overrides || {}) };
+          const language = getUiLanguage(settings);
+          const text = String(message.text ?? "").trim();
+          if (!text) {
+            throw new Error(t(language, "background.noSpeakableText"));
+          }
+
+          const model = String(settings.translationModel ?? "").trim();
+          if (!model) {
+            throw new Error(t(language, "background.fillTranslationConfigInSettings"));
+          }
+
+          const targetLanguage =
+            String(settings.translationTargetLanguage ?? "").trim() ||
+            (language === "zh-CN" ? "中文" : "English");
+
+          const apiUrl = normalizeTranslationApiUrl(settings.translationApiUrl, language);
+
+          await translateTextStream(
+            text,
+            {
+              apiKey: String(settings.translationApiKey ?? "").trim(),
+              apiUrl,
+              model,
+              targetLanguage,
+              language,
+            },
+            {
+              signal: abortController.signal,
+              onStart: (info) => {
+                try {
+                  port.postMessage({ type: "STREAM_START", ...info });
+                } catch (_e) {}
+              },
+              onChunk: (chunk) => {
+                try {
+                  port.postMessage({ type: "STREAM_CHUNK", chunk });
+                } catch (_e) {}
+              },
+              onDone: (result) => {
+                try {
+                  port.postMessage({ type: "STREAM_DONE", ...result });
+                } catch (_e) {}
+              },
+            },
+          );
+        } catch (error) {
+          if (abortController.signal.aborted) {
+            return;
+          }
+          try {
+            port.postMessage({
+              type: "STREAM_ERROR",
+              error: error instanceof Error ? error.message : String(error),
+            });
+          } catch (_e) {}
+        }
+      }
+    });
+  }
+});
+
 async function handleMessage(message) {
   switch (message?.type) {
     case "GET_SETTINGS_SUMMARY": {
@@ -384,7 +458,7 @@ function buildHeaders(apiKey) {
 function buildTranslationHeaders(apiKey) {
   const headers = {
     "Content-Type": "application/json",
-    Accept: "application/json",
+    Accept: "text/event-stream, application/json",
   };
 
   if (String(apiKey ?? "").trim()) {
@@ -988,7 +1062,7 @@ async function maybeTranslateText(text, settings) {
     throw new Error(t(language, "background.fillTranslationModel"));
   }
 
-  const translatedText = await translateTextWithLlm(text, {
+  const translatedText = await translateTextStream(text, {
     apiKey: String(settings.translationApiKey ?? "").trim(),
     apiUrl: normalizeTranslationApiUrl(settings.translationApiUrl, language),
     model,
@@ -1023,7 +1097,7 @@ async function translateText(rawText, overrides = {}) {
     (language === "zh-CN" ? "中文" : "English");
 
   const apiUrl = normalizeTranslationApiUrl(settings.translationApiUrl, language);
-  const translatedText = await translateTextWithLlm(text, {
+  const translatedText = await translateTextStream(text, {
     apiKey: String(settings.translationApiKey ?? "").trim(),
     apiUrl,
     model,
@@ -1039,14 +1113,15 @@ async function translateText(rawText, overrides = {}) {
   };
 }
 
-async function translateTextWithLlm(text, options) {
+async function translateTextStream(text, options, { onStart, onChunk, onDone, signal } = {}) {
   const response = await fetch(options.apiUrl, {
     method: "POST",
     headers: buildTranslationHeaders(options.apiKey),
+    signal,
     body: JSON.stringify({
       model: options.model,
       temperature: 0.2,
-      stream: false,
+      stream: true,
       messages: [
         {
           role: "system",
@@ -1072,25 +1147,117 @@ async function translateTextWithLlm(text, options) {
     );
   }
 
-  const rawText = await response.text();
-  let payload = null;
+  onStart?.({
+    targetLanguage: options.targetLanguage,
+    model: options.model,
+  });
 
-  try {
-    payload = JSON.parse(rawText);
-  } catch (error) {
-    // If the server returned SSE streams (data: {...}) or Newline-Delimited JSON (NDJSON)
-    payload = parseStreamOrNdjson(rawText);
-    if (!payload) {
-      throw error;
+  const contentType = response.headers.get("content-type") || "";
+  let fullText = "";
+
+  // If server responded with standard JSON instead of SSE stream
+  if (!response.body || (contentType.includes("application/json") && !contentType.includes("event-stream"))) {
+    const rawText = await response.text();
+    let payload = null;
+    try {
+      payload = JSON.parse(rawText);
+    } catch (_error) {
+      payload = parseStreamOrNdjson(rawText);
     }
+    const extracted = extractTranslationText(payload) || rawText;
+    fullText = extracted;
+    onChunk?.(extracted);
+    onDone?.({ fullText, targetLanguage: options.targetLanguage, model: options.model });
+    return fullText;
   }
 
-  const translatedText = extractTranslationText(payload);
-  if (!translatedText) {
+  // Parse SSE stream
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  try {
+    let isStreamDone = false;
+    while (!isStreamDone) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split(/\r?\n/);
+      buffer = lines.pop() ?? "";
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith(":")) continue;
+        if (trimmed === "data: [DONE]" || trimmed === "data:[DONE]") {
+          isStreamDone = true;
+          break;
+        }
+        if (trimmed.startsWith("data:")) {
+          const jsonStr = trimmed.slice(5).trim();
+          if (!jsonStr) continue;
+          try {
+            const data = JSON.parse(jsonStr);
+            if (data?.error?.message) {
+              throw new Error(data.error.message);
+            }
+            const delta =
+              data?.choices?.[0]?.delta?.content ??
+              data?.choices?.[0]?.text ??
+              "";
+            if (delta) {
+              fullText += delta;
+              onChunk?.(delta);
+            }
+          } catch (e) {
+            if (e?.message && !e.message.includes("JSON")) {
+              throw e;
+            }
+            // ignore partial JSON chunk
+          }
+        }
+      }
+    }
+
+    if (!isStreamDone && buffer.trim().startsWith("data:")) {
+      const jsonStr = buffer.trim().slice(5).trim();
+      if (jsonStr && jsonStr !== "[DONE]") {
+        try {
+          const data = JSON.parse(jsonStr);
+          if (data?.error?.message) {
+            throw new Error(data.error.message);
+          }
+          const delta =
+            data?.choices?.[0]?.delta?.content ??
+            data?.choices?.[0]?.text ??
+            "";
+          if (delta) {
+            fullText += delta;
+            onChunk?.(delta);
+          }
+        } catch (e) {
+          if (e?.message && !e.message.includes("JSON")) {
+            throw e;
+          }
+        }
+      }
+    }
+  } finally {
+    try {
+      reader.releaseLock();
+    } catch (_e) {}
+  }
+
+  if (!fullText.trim()) {
     throw new Error(t(options.language, "background.translationNoResult"));
   }
 
-  return translatedText;
+  onDone?.({ fullText, targetLanguage: options.targetLanguage, model: options.model });
+  return fullText;
+}
+
+async function translateTextWithLlm(text, options) {
+  return translateTextStream(text, options);
 }
 
 function parseStreamOrNdjson(rawText) {
