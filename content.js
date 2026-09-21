@@ -408,7 +408,7 @@ document.addEventListener("keydown", (event) => {
 document.addEventListener("mouseup", handleSelectionGesture, true);
 document.addEventListener("keyup", handleSelectionGesture, true);
 document.addEventListener("scroll", () => {
-  if (!isPlaying) {
+  if (!isPlaying && !isTranslating) {
     hideBubble();
   }
 }, true);
@@ -421,7 +421,7 @@ document.addEventListener("mousedown", (event) => {
     return;
   }
   hideTranslationCard();
-  if (!isPlaying) {
+  if (!isPlaying && !isTranslating) {
     queueSelectionRefresh();
   }
 });
@@ -522,7 +522,7 @@ function updateSelectionState() {
         disabled: false,
       });
     }
-    if (!isPlaying) {
+    if (!isPlaying && !isTranslating) {
       hideBubble();
     }
     return;
@@ -1780,8 +1780,6 @@ async function triggerSelectionTranslation() {
     return;
   }
 
-  hideBubble();
-
   isTranslating = true;
   translateButton.disabled = true;
   translateButton.innerHTML = LOADING_ICON_SVG;
@@ -1818,6 +1816,7 @@ async function triggerSelectionTranslation() {
       }
     }
 
+    hideBubble();
     showTranslationCard({
       originalText: textToTranslate,
       translatedText: response.result.text,
@@ -1844,6 +1843,7 @@ async function triggerSelectionTranslation() {
       }
     }
 
+    hideBubble();
     showTranslationErrorCard(error?.message || t("content.translationFailed"), freshRect);
   } finally {
     isTranslating = false;
